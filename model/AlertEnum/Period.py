@@ -6,6 +6,6 @@ from enum import Enum, auto, unique
 
 @unique
 class Period(Enum):
-    DAY = auto(),
-    WEEK = auto()
-    MONTH = auto()
+    DAY = 1     # 1 Day per DAY
+    WEEK = 7    # 7 Days per WEEK
+    MONTH = 30  # 30 Days per MONTH

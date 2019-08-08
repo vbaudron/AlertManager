@@ -18,13 +18,10 @@ class Notification:
         :type datetime_to_check: datetime
 
         """
-
+        # get Time between both date
         delta = datetime_to_check - previous
 
-        count = delta.days
-        if self.__period is Period.WEEK:
-            count = count / 7
-        elif self.__period is Period.MONTH:
-            count = count / 30
+        # Get day divided by nb_day in period (equivalent values)
+        count = delta.days / self.__period.value
 
         return count >= self.__number

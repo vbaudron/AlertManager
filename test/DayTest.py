@@ -16,10 +16,6 @@ class DayTest(unittest.TestCase):
         self.monday = datetime(2019, 7, 29)  # 29 July 2019 was a MONDAY
         self.saturday = datetime(2019, 7, 27)  # 27 July 2019 was a SATURDAY
 
-    def test_isDay(self):
-        self.assertTrue(Day.is_day(Day.MONDAY))
-        self.assertFalse(Day.is_day(1))
-
     def test__get_day_str_name(self):
         # VALID
         name = DateUtils.get_day_name(self.monday)

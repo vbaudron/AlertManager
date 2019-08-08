@@ -2,15 +2,13 @@
 # -*-coding:Utf-8 -*
 from datetime import datetime, timedelta
 
-from pip._internal.utils.deprecation import deprecated
-
 from model.AlertEnum.Level import Level
 from model.AlertEnum.Day import Day
 from model.AlertDefinition import AlertDefinition, AlertDefinitionFlag
 
 import unittest
 
-from model.AlertEnum.AlertDefinitionStatus import AlertDefinitionStatus
+from model.AlertDefinition import AlertDefinitionStatus
 from model.Exception.MyException import DayTypeError
 
 

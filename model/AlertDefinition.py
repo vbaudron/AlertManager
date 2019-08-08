@@ -5,10 +5,7 @@ import logging as log
 from abc import ABC, abstractmethod
 from datetime import datetime
 
-from pip._internal.utils.deprecation import deprecated
-
 from model.AlertEnum.Day import Day
-from model.AlertEnum.AlertDefinitionStatus import AlertDefinitionStatus
 from model.Exception.MyException import DayTypeError
 from model.decorator.MyDecorator import controller_types
 from utils.DateUtils import DateUtils
@@ -197,8 +194,8 @@ class AlertDefinitionFlag(Flag):
 class AlertCalculator(ABC):
 
     def __init__(self):
-        self.__data__
-        self.__process__
+        self.__data__ = None
+        self.__process__ = None
         pass
 
     @abstractmethod
