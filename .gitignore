@@ -102,3 +102,8 @@ venv.bak/
 
 # mypy
 .mypy_cache/
+
+# My ADD
+.DS_Store
+.vscode/
+model/.DS_Store
