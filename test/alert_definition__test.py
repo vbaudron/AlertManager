@@ -1,15 +1,13 @@
 #!/usr/bin/python3
 # -*-coding:Utf-8 -*
+import unittest
 from datetime import datetime, timedelta
 
-from model.AlertEnum.Level import Level
-from model.AlertEnum.Day import Day
-from model.AlertDefinition import AlertDefinition, AlertDefinitionFlag
+from model.day import Day
+from model.alert import AlertDefinition, AlertDefinitionFlag, Level, MyOperator, MyComparator, PeriodUnitDefinition
 
-import unittest
-
-from model.AlertDefinition import AlertDefinitionStatus
-from model.Exception.MyException import DayTypeError
+from model.alert import AlertDefinitionStatus
+from model.my_exception import DayTypeError
 
 
 class AlertDefinitionTest(unittest.TestCase):
@@ -209,6 +207,138 @@ class AlertDefinitionTest(unittest.TestCase):
         alert_definition.set_definition_flags(flags)
         self.assertTrue(bool(alert_definition.get_definition_flag() & AlertDefinitionFlag.SAVE_ALL.value))
         self.assertTrue(bool(alert_definition.get_definition_flag() & AlertDefinitionFlag.ANOTHER_FLAG.value))
+
+    def test__my_operator(self):
+        arr = [3, 5, 10, 25, 36, 174]
+
+        # MAX
+        my_str = "MAX"
+        elem = MyOperator(my_str)
+        self.assertIsInstance(elem, MyOperator)
+        result_expected = max(arr)
+        result = elem.calculate(arr)
+        self.assertEqual(result_expected, result)
+        # ERROR
+        with self.assertRaises(TypeError):
+            elem.calculate(2)
+
+        # MIN
+        my_str = "MIN"
+        elem = MyOperator(my_str)
+        self.assertIsInstance(elem, MyOperator)
+        result_expected = min(arr)
+        result = elem.calculate(arr)
+        self.assertEqual(result_expected, result)
+        # ERROR
+        with self.assertRaises(TypeError):
+            elem.calculate(2)
+
+        # AVERAGE
+        my_str = "AVERAGE"
+        elem = MyOperator(my_str)
+        self.assertIsInstance(elem, MyOperator)
+        result_expected = sum(arr) / len(arr)
+        result = elem.calculate(arr)
+        self.assertEqual(result_expected, result)
+        # ERROR
+        with self.assertRaises(TypeError):
+            elem.calculate(2)
+
+    def test__my_comparator(self):
+        data = 5
+        value = 10
+
+        # SUP
+        my_str = "SUP"
+        elem = MyComparator(my_str)
+        self.assertIsInstance(elem, MyComparator)
+        result_expected = data > value
+        result = elem.compare(data, value)
+        self.assertEqual(result_expected, result)
+
+        # INF
+        my_str = "INF"
+        elem = MyComparator(my_str)
+        self.assertIsInstance(elem, MyComparator)
+        result_expected = data < value
+        result = elem.compare(data, value)
+        self.assertEqual(result_expected, result)
+
+        # EQUAL
+        my_str = "EQUAL"
+        elem = MyComparator(my_str)
+        self.assertIsInstance(elem, MyComparator)
+        result_expected = data == value
+        result = elem.compare(data, value)
+        self.assertEqual(result_expected, result)
+
+    def test__period_unit_definition(self):
+
+        # --- DAY ---
+        my_str = "DAY"
+        elem = PeriodUnitDefinition(my_str)
+        self.assertIsInstance(elem, PeriodUnitDefinition)
+        # SINGLE
+        base_datetime = datetime(year=2010, month=3, day=3)
+        result_expected = datetime(year=2010, month=3, day=2)
+        result = elem.go_past(base_datetime, 1)
+        self.assertEqual(result, result_expected)
+        # MULTIPLE
+        result_expected = datetime(year=2010, month=2, day=28)
+        result = elem.go_past(base_datetime, 3)
+        self.assertEqual(result, result_expected)
+
+        # --- MONTH ---
+        my_str = "MONTH"
+        elem = PeriodUnitDefinition(my_str)
+        self.assertIsInstance(elem, PeriodUnitDefinition)
+        # SIMPLE
+        base_datetime = datetime(year=2010, month=3, day=15)
+        result_expected = datetime(year=2010, month=2, day=15)
+        result = elem.go_past(base_datetime, 1)
+        self.assertEqual(result, result_expected)
+        # MULTIPLE
+        base_datetime = datetime(year=2010, month=6, day=15)
+        result_expected = datetime(year=2010, month=2, day=15)
+        result = elem.go_past(base_datetime, 4)
+        self.assertEqual(result, result_expected)
+        # 30 vs 31 DAYS per MONTH
+        base_datetime = datetime(year=2010, month=7, day=31)
+        result_expected = datetime(year=2010, month=6, day=30)
+        result = elem.go_past(base_datetime, 1)
+        self.assertEqual(result, result_expected)
+        # FEBRUARY CASE
+        base_datetime = datetime(year=2011, month=3, day=30)
+        result_expected = datetime(year=2011, month=2, day=28)
+        result = elem.go_past(base_datetime, 1)
+        self.assertEqual(result, result_expected)
+        # BISEXTILE YEAR
+        base_datetime = datetime(year=2012, month=3, day=30)
+        result_expected = datetime(year=2012, month=2, day=29)
+        result = elem.go_past(base_datetime, 1)
+        self.assertEqual(result, result_expected)
+        # MORE THAN 12 MONTH
+        base_datetime = datetime(year=2011, month=3, day=30)
+        result_expected = datetime(year=2010, month=2, day=28)
+        result = elem.go_past(base_datetime, 13)
+        self.assertEqual(result, result_expected)
+
+        # --- YEAR ---
+        my_str = "YEAR"
+        elem = PeriodUnitDefinition(my_str)
+        self.assertIsInstance(elem, PeriodUnitDefinition)
+        # SINGLE
+        base_datetime = datetime(year=2010, month=3, day=3)
+        result_expected = datetime(year=2009, month=3, day=3)
+        result = elem.go_past(base_datetime, 1)
+        self.assertEqual(result, result_expected)
+        # MULTIPLE & BISEXTILE
+        base_datetime = datetime(year=2012, month=2, day=29)
+        result_expected = datetime(year=2009, month=2, day=28)
+        result = elem.go_past(base_datetime, 3)
+        self.assertEqual(result, result_expected)
+
+
 
 
 if __name__ == '__main__':

@@ -2,8 +2,7 @@ from datetime import datetime, timedelta
 
 import unittest
 
-from model.Notification import Notification
-from model.AlertEnum.Period import Period
+from model.notification import Notification, NotificationPeriod
 
 
 class NotificationTest(unittest.TestCase):
@@ -19,7 +18,7 @@ class NotificationTest(unittest.TestCase):
         self.assertFalse(notification.is_notification_allowed(yesterday, today))
         self.assertTrue(notification.is_notification_allowed(twenty_days_ago, today))
 
-        notification = Notification(number=1, period=Period.MONTH)
+        notification = Notification(number=1, period=NotificationPeriod.MONTH)
         self.assertFalse(notification.is_notification_allowed(yesterday, today))
         self.assertFalse(notification.is_notification_allowed(twenty_days_ago, today))
         self.assertTrue(notification.is_notification_allowed(fourty_days_ago, today))

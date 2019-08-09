@@ -1,6 +1,6 @@
 import logging as log
 
-from model.AlertEnum import Day
+from model import day
 
 
 class DayTypeError(Exception):
@@ -10,5 +10,5 @@ class DayTypeError(Exception):
         self.wrong_value = str(wrong_value)
 
     def __str__(self):
-        my_str = "{0} is not a valid value. Day valid values are : {1}".format(self.wrong_value, Day.Day.str_values())
+        my_str = "{0} is not a valid value. Day valid values are : {1}".format(self.wrong_value, day.Day.str_values())
         return my_str

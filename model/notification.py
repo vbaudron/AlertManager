@@ -1,14 +1,22 @@
-from model.AlertEnum.Period import Period
+from enum import IntEnum, unique
+from datetime import datetime
+
+
+@unique
+class NotificationPeriod(IntEnum):
+    DAY = 1     # 1 Day per DAY
+    WEEK = 7    # 7 Days per WEEK
+    MONTH = 30  # 30 Days per MONTH
 
 
 class Notification:
 
-    def __init__(self, number=1, period=Period.DAY, email=None):
+    def __init__(self, number=1, period=NotificationPeriod.DAY, email=None):
         self.__number = number
         self.__period = period
         self.__email = email
 
-    def is_notification_allowed(self, previous, datetime_to_check):
+    def is_notification_allowed(self, previous: datetime, datetime_to_check: datetime):
         """
         check if we are allowed to send a new notification
 
@@ -25,3 +33,5 @@ class Notification:
         count = delta.days / self.__period.value
 
         return count >= self.__number
+
+

@@ -3,11 +3,9 @@
 import calendar
 import datetime
 
-from model.AlertEnum.Day import Day
-
 import unittest
 
-from utils.DateUtils import DateUtils
+from model.utility import DateUtils
 
 
 class DayTest(unittest.TestCase):

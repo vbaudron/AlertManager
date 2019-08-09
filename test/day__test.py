@@ -2,12 +2,12 @@
 # -*-coding:Utf-8 -*
 from datetime import datetime
 
-from model.AlertEnum.Day import Day
+from model.day import Day
 
 import unittest
 
-from model.Exception.MyException import DayTypeError
-from utils.DateUtils import DateUtils
+from model.my_exception import DayTypeError
+from model.utility import DateUtils
 
 
 class DayTest(unittest.TestCase):

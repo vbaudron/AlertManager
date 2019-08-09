@@ -3,7 +3,7 @@
 
 from enum import Flag, auto, unique
 
-from model.Exception.MyException import DayTypeError
+from model.my_exception import DayTypeError
 
 
 @unique
