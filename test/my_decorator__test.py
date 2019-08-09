@@ -1,11 +1,11 @@
 #!/usr/bin/python3
 # -*-coding:Utf-8 -*
 
-from model.AlertEnum.Day import Day
+from model.day import Day
 
 import unittest
 
-from model.decorator.MyDecorator import controller_types
+from model.tokill.my_decorator import controller_types
 
 
 class MyDecoratorTest(unittest.TestCase):

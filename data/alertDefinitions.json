@@ -1,0 +1,44 @@
+[
+    {
+        "name" : "alertDefinition1",
+        "id" : "id_1",
+        "calculator_type" : "value",
+        "calculator" : {
+            "data_name" : "consommation",
+            "operator" : "AVERAGE",
+            "data_period" : {
+                "quantity" : 5,
+                "unit" : "Day"
+            },
+            "reference_value" : 50,
+            "comparator" : "SUP"
+        }
+    },
+    {
+        "name" : "alertDefinition2",
+        "id" : "id_2",
+        "calculator_type" : "value",
+        "calculator" : {
+            "data_name" : "consommation",
+            "operator" : "MAX",
+            "reference_value" : 50,
+            "comparator" : "SUP"
+        }
+    },
+    {
+        "name" : "alertDefinition2",
+        "id" : "id_2",
+        "calculator_type" : "percent",
+        "calculator" : {
+            "data_name" : "consommation",
+            "operator" : "MAX",
+            "reference_value" : 15,
+            "data_period" : {
+                "quantity" : 5,
+                "unit" : "Day"
+            },
+            "percent_period" : "year",
+            "comparator" : "SUP"
+        }
+    }
+]
