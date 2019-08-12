@@ -2,9 +2,11 @@
 # -*-coding:Utf-8 -*
 import unittest
 from datetime import datetime, timedelta
+from unittest.mock import patch, MagicMock
 
 from model.day import Day
-from model.alert import AlertDefinition, AlertDefinitionFlag, Level, MyOperator, MyComparator, PeriodUnitDefinition
+from model.alert import AlertDefinition, AlertDefinitionFlag, Level, MyOperator, MyComparator, PeriodUnitDefinition, \
+    PercentBasedCalculator, PeriodDefinition, AlertCalculator
 
 from model.alert import AlertDefinitionStatus
 from model.my_exception import DayTypeError
@@ -208,135 +210,271 @@ class AlertDefinitionTest(unittest.TestCase):
         self.assertTrue(bool(alert_definition.get_definition_flag() & AlertDefinitionFlag.SAVE_ALL.value))
         self.assertTrue(bool(alert_definition.get_definition_flag() & AlertDefinitionFlag.ANOTHER_FLAG.value))
 
-    def test__my_operator(self):
-        arr = [3, 5, 10, 25, 36, 174]
 
-        # MAX
+class MyOperatorTest(unittest.TestCase):
+
+    def setUp(self):
+        self.arr = [3, 5, 10, 25, 36, 174]
+
+    def test__max(self):
         my_str = "MAX"
         elem = MyOperator(my_str)
+
         self.assertIsInstance(elem, MyOperator)
-        result_expected = max(arr)
-        result = elem.calculate(arr)
+        result_expected = max(self.arr)
+        result = elem.calculate(self.arr)
         self.assertEqual(result_expected, result)
+
         # ERROR
         with self.assertRaises(TypeError):
             elem.calculate(2)
 
-        # MIN
+    def test__min(self):
         my_str = "MIN"
         elem = MyOperator(my_str)
+
         self.assertIsInstance(elem, MyOperator)
-        result_expected = min(arr)
-        result = elem.calculate(arr)
+        result_expected = min(self.arr)
+        result = elem.calculate(self.arr)
         self.assertEqual(result_expected, result)
+
         # ERROR
         with self.assertRaises(TypeError):
             elem.calculate(2)
 
-        # AVERAGE
+    def test__average(self):
         my_str = "AVERAGE"
         elem = MyOperator(my_str)
+
         self.assertIsInstance(elem, MyOperator)
-        result_expected = sum(arr) / len(arr)
-        result = elem.calculate(arr)
+        result_expected = sum(self.arr) / len(self.arr)
+        result = elem.calculate(self.arr)
         self.assertEqual(result_expected, result)
+
         # ERROR
         with self.assertRaises(TypeError):
             elem.calculate(2)
 
-    def test__my_comparator(self):
-        data = 5
-        value = 10
+    class MyOperatorTest(unittest.TestCase):
 
-        # SUP
-        my_str = "SUP"
-        elem = MyComparator(my_str)
-        self.assertIsInstance(elem, MyComparator)
-        result_expected = data > value
-        result = elem.compare(data, value)
-        self.assertEqual(result_expected, result)
+        def setUp(self):
+            self.data = 5
+            self.value = 10
 
-        # INF
-        my_str = "INF"
-        elem = MyComparator(my_str)
-        self.assertIsInstance(elem, MyComparator)
-        result_expected = data < value
-        result = elem.compare(data, value)
-        self.assertEqual(result_expected, result)
+        def test__sup(self):
+            my_str = "SUP"
+            elem = MyComparator(my_str)
+            self.assertIsInstance(elem, MyComparator)
 
-        # EQUAL
-        my_str = "EQUAL"
-        elem = MyComparator(my_str)
-        self.assertIsInstance(elem, MyComparator)
-        result_expected = data == value
-        result = elem.compare(data, value)
-        self.assertEqual(result_expected, result)
+            result_expected = self.data > self.value
+            result = elem.compare(self.data, self.value)
 
-    def test__period_unit_definition(self):
+            self.assertEqual(result_expected, result)
 
-        # --- DAY ---
+        def test__sup(self):
+            my_str = "INF"
+            elem = MyComparator(my_str)
+            self.assertIsInstance(elem, MyComparator)
+
+            result_expected = self.data < self.value
+            result = elem.compare(self.data, self.value)
+
+            self.assertEqual(result_expected, result)
+
+        def test__sup(self):
+            my_str = "EQUAL"
+            elem = MyComparator(my_str)
+            self.assertIsInstance(elem, MyComparator)
+
+            result_expected = self.data == self.value
+            result = elem.compare(self.data, self.value)
+
+            self.assertEqual(result_expected, result)
+
+
+class PeriodUnitDefinitionTest(unittest.TestCase):
+
+    def setUp(self):
+        self.end_date = datetime(year=2012, month=2, day=29)
+        self.mock_return_value = datetime(year=2000, month=12, day=12)
+        self.period_quantity = 8
+
+    def test__day(self):
         my_str = "DAY"
         elem = PeriodUnitDefinition(my_str)
         self.assertIsInstance(elem, PeriodUnitDefinition)
+
         # SINGLE
         base_datetime = datetime(year=2010, month=3, day=3)
         result_expected = datetime(year=2010, month=3, day=2)
         result = elem.go_past(base_datetime, 1)
         self.assertEqual(result, result_expected)
+
         # MULTIPLE
         result_expected = datetime(year=2010, month=2, day=28)
         result = elem.go_past(base_datetime, 3)
         self.assertEqual(result, result_expected)
 
-        # --- MONTH ---
+
+    def test__month(self):
         my_str = "MONTH"
         elem = PeriodUnitDefinition(my_str)
         self.assertIsInstance(elem, PeriodUnitDefinition)
+
         # SIMPLE
         base_datetime = datetime(year=2010, month=3, day=15)
         result_expected = datetime(year=2010, month=2, day=15)
         result = elem.go_past(base_datetime, 1)
         self.assertEqual(result, result_expected)
+
         # MULTIPLE
         base_datetime = datetime(year=2010, month=6, day=15)
         result_expected = datetime(year=2010, month=2, day=15)
         result = elem.go_past(base_datetime, 4)
         self.assertEqual(result, result_expected)
+
         # 30 vs 31 DAYS per MONTH
         base_datetime = datetime(year=2010, month=7, day=31)
         result_expected = datetime(year=2010, month=6, day=30)
         result = elem.go_past(base_datetime, 1)
         self.assertEqual(result, result_expected)
+
         # FEBRUARY CASE
         base_datetime = datetime(year=2011, month=3, day=30)
         result_expected = datetime(year=2011, month=2, day=28)
         result = elem.go_past(base_datetime, 1)
         self.assertEqual(result, result_expected)
+
         # BISEXTILE YEAR
         base_datetime = datetime(year=2012, month=3, day=30)
         result_expected = datetime(year=2012, month=2, day=29)
         result = elem.go_past(base_datetime, 1)
         self.assertEqual(result, result_expected)
+
         # MORE THAN 12 MONTH
         base_datetime = datetime(year=2011, month=3, day=30)
         result_expected = datetime(year=2010, month=2, day=28)
         result = elem.go_past(base_datetime, 13)
         self.assertEqual(result, result_expected)
 
-        # --- YEAR ---
+    def test__year(self):
         my_str = "YEAR"
         elem = PeriodUnitDefinition(my_str)
         self.assertIsInstance(elem, PeriodUnitDefinition)
+
         # SINGLE
         base_datetime = datetime(year=2010, month=3, day=3)
         result_expected = datetime(year=2009, month=3, day=3)
         result = elem.go_past(base_datetime, 1)
         self.assertEqual(result, result_expected)
+
         # MULTIPLE & BISEXTILE
         base_datetime = datetime(year=2012, month=2, day=29)
         result_expected = datetime(year=2009, month=2, day=28)
         result = elem.go_past(base_datetime, 3)
         self.assertEqual(result, result_expected)
+
+
+class PeriodDefinitionTest(unittest.TestCase):
+
+    def setUp(self):
+        self.end_date = datetime(year=2012, month=2, day=29)
+        self.mock_return_value = datetime(year=2000, month=12, day=12)
+        self.period_quantity = 8
+
+    def test__init(self):
+        period_unit = PeriodUnitDefinition.DAY
+
+        period_definition = PeriodDefinition(unit=period_unit, quantity=self.period_quantity)
+
+        self.assertIsInstance(period_definition, PeriodDefinition)
+        self.assertEqual(period_definition.get_unit(), period_unit)
+        self.assertEqual(period_definition.get_quantity(), self.period_quantity)
+
+    def test__get_start_date_from_end_date(self):
+        # GENERAL
+        period_unit = PeriodUnitDefinition.DAY
+        period_definition = PeriodDefinition(unit=period_unit, quantity=self.period_quantity)
+
+        with patch("model.alert.PeriodDefinition.get_start_date_from_end_date", return_value=self.mock_return_value) as mock:
+            result = period_definition.get_start_date_from_end_date(end_date=self.end_date)
+            mock.assert_called_with(end_date=self.end_date)
+            self.assertEqual(result, self.mock_return_value)
+
+    def test__get_start_date_from_end_date_go_past_association(self):
+        # -- DAY --
+        period_unit = PeriodUnitDefinition.DAY
+        period_definition = PeriodDefinition(unit=period_unit, quantity=self.period_quantity)
+
+        with patch("model.alert.PeriodUnitDefinition.DAY.go_past", return_value=self.mock_return_value) as mock:
+            result = period_definition.get_start_date_from_end_date(end_date=self.end_date)
+            mock.assert_called_with(end_date=self.end_date, quantity=self.period_quantity)
+            self.assertEqual(result, self.mock_return_value)
+
+        # -- WEEK --
+        period_unit = PeriodUnitDefinition.WEEK
+        period_definition = PeriodDefinition(unit=period_unit, quantity=self.period_quantity)
+
+        with patch("model.alert.PeriodUnitDefinition.WEEK.go_past", return_value=self.mock_return_value) as mock:
+            result = period_definition.get_start_date_from_end_date(end_date=self.end_date)
+            mock.assert_called_with(end_date=self.end_date, quantity=self.period_quantity)
+            self.assertEqual(result, self.mock_return_value)
+
+        # -- MONTH --
+        period_unit = PeriodUnitDefinition.MONTH
+        period_definition = PeriodDefinition(unit=period_unit, quantity=self.period_quantity)
+
+        with patch("model.alert.PeriodUnitDefinition.MONTH.go_past", return_value=self.mock_return_value) as mock:
+            result = period_definition.get_start_date_from_end_date(end_date=self.end_date)
+            mock.assert_called_with(end_date=self.end_date, quantity=self.period_quantity)
+            self.assertEqual(result, self.mock_return_value)
+
+        # -- YEAR --
+        period_unit = PeriodUnitDefinition.YEAR
+        period_definition = PeriodDefinition(unit=period_unit, quantity=self.period_quantity)
+
+        with patch("model.alert.PeriodUnitDefinition.YEAR.go_past", return_value=self.mock_return_value) as mock:
+            result = period_definition.get_start_date_from_end_date(end_date=self.end_date)
+            mock.assert_called_with(end_date=self.end_date, quantity=self.period_quantity)
+            self.assertEqual(result, self.mock_return_value)
+
+
+class PercentBasedCalculatorTest(unittest.TestCase):
+
+    def setUp(self):
+        self.data_name = "consommation"
+        self.operator = MyOperator.MAX
+        self.comparator = MyComparator.SUP
+        self.reference_value = 15
+        self.data = None
+        self.value = None
+        self.percent_period = "YEAR"
+        self.period_unit = PeriodUnitDefinition.DAY
+        self.period_quantity = 1
+        self.generate_setup()
+
+    def generate_setup(self):
+        self.setup = {
+            "data_name": self.data_name,
+            "operator": self.operator.value,
+            "reference_value": self.reference_value,
+            "percent_period": self.percent_period,
+            "comparator": str(self.comparator.value),
+            "data_period": {
+                "quantity": self.period_quantity,
+                "unit": self.period_unit.value
+            }
+        }
+
+    def test__init(self):
+        percent_calculator = PercentBasedCalculator(self.setup)
+        self.assertIsInstance(percent_calculator, PercentBasedCalculator)
+        self.assertIsInstance(percent_calculator, AlertCalculator)
+
+
+  #  def test__get_comparative_value_from_reference(self):
+      #  percent_calculator = PercentBasedCalculator(self.setup)
+
 
 
 

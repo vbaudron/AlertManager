@@ -14,14 +14,16 @@ from model.utility import get_day_name_from_datetime
 from enum import Enum, auto, unique, Flag
 
 
-# ALERT DEFINITION
+# -----------------------------------------------   ALERT DEFINITION   -------------------------------------------------
+
+# STATUS
 @unique
 class AlertDefinitionStatus(Enum):  # USELESS --> Has Been moved to FLAG
     INACTIVE = 0
     ACTIVE = auto()
     ARCHIVE = auto()
 
-
+# FLAG
 @unique
 class AlertDefinitionFlag(Flag):
     INACTIVE = 0           # Nothing
@@ -29,13 +31,14 @@ class AlertDefinitionFlag(Flag):
     SAVE_ALL = auto()      # Always calculate Alert even if notification not allowed & if alert exist, save it
     ANOTHER_FLAG = auto()  # Flag to Test - Do not forget to Refactor when change it
 
-
+# LEVEL
 @unique
 class Level(Enum):
     LOW = 0
     HIGH = auto()
 
-# ALERT DEFINITION CLASS
+
+# CLASS
 class AlertDefinition:
     """
     This class represent how is define an Alert.
@@ -57,10 +60,10 @@ class AlertDefinition:
         self.__alert_definition_flag = AlertDefinitionFlag.INACTIVE.value
 
     @property
-    def is_active(self):
+    def is_active(self) -> bool:
         return self.has_definition_flag(AlertDefinitionFlag.ACTIVE)
 
-    def set_inactive(self):
+    def set_inactive(self) -> None:
         self.remove_definition_flag(AlertDefinitionFlag.ACTIVE)
 
     # CHECK
@@ -94,7 +97,7 @@ class AlertDefinition:
 
     # NOTIFICATION
     @controller_types(datetime)
-    def is_notification_allowed(self, datetime_to_check: datetime):
+    def is_notification_allowed(self, datetime_to_check: datetime) -> bool:
         """
         check if we are allowed to send a new notification
 
@@ -106,20 +109,20 @@ class AlertDefinition:
         pass
 
     # WATCHING PERIOD
-    def add_day_to_watching_period(self, day: Day):
+    def add_day_to_watching_period(self, day: Day) -> None:
         try:
             self.__watching_period |= day.value
         except AttributeError as error:
             log.error(error)
             raise DayTypeError(day)
 
-    def remove_day_from_watching_period(self, day: Day):
+    def remove_day_from_watching_period(self, day: Day) -> None:
         self.__watching_period ^= day.value
 
-    def reset_watching_period(self):
+    def reset_watching_period(self) -> None:
         self.__watching_period = Day.NONE.value
 
-    def is_datetime_in_watching_period(self, datetime_to_check: datetime):
+    def is_datetime_in_watching_period(self, datetime_to_check: datetime) -> bool:
         """
         check if datetime is a period that we watch
 
@@ -135,7 +138,7 @@ class AlertDefinition:
         except DayTypeError as error:
             log.error(error.__str__())
 
-    def set_watching_period(self, days_list: array):
+    def set_watching_period(self, days_list: array) -> None:
         """
         Replace the current watching Period by the one in Param
 
@@ -150,13 +153,13 @@ class AlertDefinition:
         except DayTypeError as error:
             log.error(error.__str__())
 
-    def has_day_in_watching_period(self, day: Day):
+    def has_day_in_watching_period(self, day: Day) -> bool:
         try:
             return bool(day.value & self.__watching_period)
         except AttributeError:
             raise DayTypeError
 
-    def get_watching_period(self):
+    def get_watching_period(self) -> "self.__watching_period":
         return self.__watching_period
 
     # DEFINITION STATUS @deprecated --> replace by a flag in AlertDefinitionFlag class
@@ -199,86 +202,61 @@ class AlertDefinition:
         return self.__alert_definition_flag
 
 
+# ---------------------------------------------------   OPERATOR   -----------------------------------------------------
+
+def calculate_average(data: array):
+    return sum(data) / len(data)
 
 
-
-class AlertCalculator(ABC):
-
-    def __init__(self, setup: dict):
-        self.setup = setup
-        self._data_name = setup["data_name"]
-        self._operator = MyOperator(setup["operator"])
-        self._comparator = MyComparator(setup["comparator"])
-        self._reference_value = setup["reference_value"]
-        self._data = None   # data calculated from data_name to check
-        self._value = None  # value to compare with
-
-    def __get_all_data_in_db(self, period):
-        all_data = [30, 45, 60]  # TODO : Link To DB
-        return all_data
-
-    # OPERATOR
-    def __get_data(self):
-        """ 
-        get all data 
-        """
-        period = self._get_data_period()
-        all_data = self.__get_all_data_in_db(period)
-        return self._operator.calculate(all_data)
-
-    @abstractmethod
-    def _get_data_period(self):
-        pass
-
-    @abstractmethod
-    def _get_comparative_value_from_reference(self):
-        pass
-
-    def is_alert_situation(self):
-        self._data = self.__get_data()
-        self._value = self._get_comparative_value_from_reference()
-        return self._comparator.compare(self._data, self._value)
+def find_max(data: array):
+    return max(data)
 
 
-class ValueBasedCalculator(AlertCalculator):
-
-    def __init__(self, setup: dict):
-        super.__init__(setup)
-
-    def _get_comparative_value_from_reference(self):
-        return self._reference_value
-
-    def _get_data_period(self):
-        if self._operator is MyOperator.AVERAGE:
-            pass
+def find_min(data: array):
+    return min(data)
 
 
-class PercentBasedCalculator(AlertCalculator):
+# CLASS
+class MyOperator(Enum):
+    MAX = "MAX", find_max
+    MIN = "MIN", find_min
+    AVERAGE = "AVERAGE", calculate_average
 
-    def __init__(self, setup: dict):
-        super.__init__(setup)
-        self.__percent_period = setup["percent_period"]
-
-    def _get_comparative_value_from_reference(self):
-        if self.__percent_period is ComparativeValueCalculator.GOAL:
-            return self.__get_goal_value_in_db()
-        else:
-            return self.__get_value_from_past_period()
+    def __new__(cls, str_name, method):
+        obj = object.__new__(cls)
+        obj._value_ = str_name
+        obj.calculate = method
+        return obj
 
 
-    def __get_goal_value_in_db(self):
-        # TODO
-        pass
+# --------------------------------------------------   COMPARATOR   ----------------------------------------------------
 
-    def __get_values_from_past_period(self):
-        pass
+def is_sup(data, value):
+    return data > value
 
-    def _get_data_period(self):
-        pass
 
-    def __get_comparative_period(self):
-        pass
+def is_inf(data, value):
+    return data < value
 
+
+def equal(data, value):
+    return data == value
+
+
+# CLASS
+class MyComparator(Enum):
+    SUP = "SUP", is_sup
+    INF = "INF", is_inf
+    EQUAL = "EQUAL", equal
+
+    def __new__(cls, str_name, method):
+        obj = object.__new__(cls)
+        obj._value_ = str_name
+        obj.compare = method
+        return obj
+
+
+# -------------------------------------------------   PERIOD Class   ---------------------------------------------------
 
 def go_past_with_days(end_date: datetime, quantity):
     return end_date - timedelta(days=quantity)
@@ -297,11 +275,10 @@ def go_past_with_months(end_date: datetime, quantity):
 
     new_month = end_date.month - quantity
     if new_month < 1:
-        new_year -=1
+        new_year -= 1
         new_month += 12
 
     last_day_of_month = calendar.monthrange(new_year, new_month)[1]
-    print(last_day_of_month)
     new_day = min(end_date.day, last_day_of_month)
     return datetime(year=new_year, month=new_month, day=new_day)
 
@@ -314,6 +291,11 @@ def go_past_with_years(end_date: datetime, quantity):
 
 
 class PeriodUnitDefinition(Enum):
+    """
+       Represent units of period available
+       value : represent the String associated to the period - it is the KEY in json file
+       go_past : it is the method associated to calculate the start date from the end_date
+   """
     DAY = "DAY", go_past_with_days
     WEEK = "WEEK", go_past_with_weeks
     MONTH = "MONTH", go_past_with_months
@@ -326,17 +308,33 @@ class PeriodUnitDefinition(Enum):
         return obj
 
 
-
 class PeriodDefinition:
-    def __init__(self, setup: dict):
-        self._unit = setup["unit"]
-        self._quantity = setup["quantity"]
 
-    def get_start_date_from_end_date(self):
-        pass
+    _unit: PeriodUnitDefinition
+    _quantity: int
 
+    def __init__(self, unit: PeriodUnitDefinition, quantity: int):
+        self._unit = unit
+        self._quantity = quantity
 
+    def get_start_date_from_end_date(self, end_date: datetime):
+        return self._unit.go_past(end_date=end_date, quantity=self._quantity)
+
+    def get_unit(self):
+        return self._unit
+
+    def get_quantity(self):
+        return self._quantity
+
+# CLASS
 class Period:
+    """
+        Represent a time period.
+    """
+
+    __start_date: datetime
+    __end_date: datetime
+
     def __init__(self, start: datetime, end: datetime):
         self.__start_date = start
         self.__end_date = end
@@ -348,79 +346,225 @@ class Period:
         return self.__end_date
 
 
-
-def get_last_year_period(start_datetime: datetime, period:PeriodDefinition):
-    """
-    :param start_datetime datetime
-    :rtype: Period
-    """
-    end_date = start_datetime - timedelta(years=1)
-    pass
+# ---------------------------------------------------   FACTORY   ------------------------------------------------------
 
 
-def get_previous_similar_period():
-    pass
+# -------------- [ PERIOD ] --------------
+
+class PeriodGenerator(ABC):
+
+    _period: Period
+
+    def get_pertinent_period(self):
+        return self._period
 
 
-class ComparativeValueCalculator(Enum):
-    PREVIOUS_PERIOD = "PREVIOUS_PERIOD", get_previous_similar_period,
-    GOAL = "GOAL", None
+class LastCheckBasedPeriod(PeriodGenerator):
+
+    def __init__(self, last_check: datetime, today: datetime) -> None:
+        super().__init__()
+        self._period = Period(start=last_check, end=today)
 
 
+class UserBasedPeriod(PeriodGenerator):
 
-# OPERATOR
-def calculate_average(data: array):
-    return sum(data) / len(data)
+    __period_definition: PeriodDefinition
 
+    def __init__(self, today: datetime, user_data: dict) -> None:
+        super().__init__()
+        self.generate_period_definition(unit=user_data["unit"], quantity=user_data["quantity"])
+        self.generate_period(today=today)
 
-def find_max(data: array):
-    return max(data)
+    def generate_period_definition(self, unit: str, quantity: int):
+        period_unit = PeriodUnitDefinition(unit)
+        self.__period_definition = PeriodDefinition(period_unit=period_unit, quantity=quantity)
 
-
-def find_min(data: array):
-    return min(data)
-
-
-class MyOperator(Enum):
-    MAX = "MAX", find_max
-    MIN = "MIN", find_min
-    AVERAGE = "AVERAGE", calculate_average
-
-    def __new__(cls, str_name, method):
-        obj = object.__new__(cls)
-        obj._value_ = str_name
-        obj.calculate = method
-        return obj
+    def generate_period(self, today: datetime):
+        start_date = self.__period_definition.get_start_date_from_end_date(end_date=today)
+        self._period = Period(start=start_date, end=today)
 
 
-# COMPARATOR
-def is_sup(data, value):
-    return data > value
+class NoPeriodBased(PeriodGenerator):
+    def __init__(self, user_data: dict) -> None:
+        super().__init__()
+        self._period = None
 
 
-def is_inf(data, value):
-    return data < value
+# -------------- [ PERCENT VALUE ] --------------
+
+class ValueToCompareModifier(ABC):
+
+    PERCENT = "PERCENT"
+    VALUE = "VALUE"
+
+    _percent: int
+
+    def calculate_value_to_compare(self, value_base) -> "value to compare data with":
+        return (self._percent / 100) * value_base
 
 
-def equal(data, value):
-    return data == value
+class FullValue(ValueToCompareModifier):
+
+    def __init__(self) -> None:
+        super().__init__()
+        self._percent = 100
 
 
-class MyComparator(Enum):
-    MAX = "SUP", is_sup
-    MIN = "INF", is_inf
-    AVERAGE = "EQUAL", equal
+class PercentValue(ValueToCompareModifier):
 
-    def __new__(cls, str_name, method):
-        obj = object.__new__(cls)
-        obj._value_ = str_name
-        obj.compare = method
-        return obj
+    def __init__(self, percent) -> None:
+        super().__init__()
+        self._percent = percent
 
 
+# -------------- [ VALUE GENERATOR] --------------
+
+class ValueGenerator(ABC):
+
+    SIMPLE_DB_BASED_VALUE = "SIMPLE_DB_BASED_VALUE"
+    PERIOD_BASED_VALUE = "PERIOD_BASED_VALUE"
+
+    _value: float
+
+    def get_value(self):
+        return self._value
 
 
+class UserBaseValueGenerator(ValueGenerator):
+
+    def __init__(self, user_data: int) -> None:
+        super().__init__()
+        self._value = user_data
 
 
+class DataBaseValue(ABC, ValueGenerator):
 
+    def __init__(self, conn_info: dict) -> None:
+        super().__init__()
+        self.connect(conn_info)
+
+    def connect(self, conn_info: dict): # TODO
+        pass
+
+    @abstractmethod
+    def get_value_in_db(self):
+        raise NotImplementedError
+
+
+class SimpleDBBasedValueGenerator(DataBaseValue): # GOAL
+
+    def __init__(self, conn_info: dict) -> None:
+        super().__init__(conn_info=conn_info)
+        self.get_value_in_db()
+
+    def get_value_in_db(self):
+        pass #TODO
+
+
+class PeriodBasedValueGenerator(DataBaseValue):
+
+    __period: Period
+
+    def __init__(self, conn_info: dict, user_data: dict, today: datetime) -> None:
+        super().__init__(conn_info=conn_info)
+        self.generate_period(user_data=user_data, today=today)
+        self.get_value_in_db()
+
+    def generate_period(self, user_data: dict, today: datetime):
+        period_generator = UserBasedPeriod(user_data=user_data, today=today)
+        self.__period = period_generator.get_pertinent_period()
+
+
+    def get_value_in_db(self):
+        pass  # TODO
+
+
+# ------------------ [ FACTORY Class ] ---------------------
+
+class AlertCalculator:
+
+    __data_period_generator: PeriodGenerator
+    __value_to_compare: ValueToCompareModifier  # TODO
+
+    __setup: dict
+    _data_name: str
+    _operator: MyOperator
+    _comparator: MyComparator
+    _reference_value: int
+    _data: float  # data to check - calculated from data_name
+    _value: float  # value to compare with
+
+    def __init__(self, setup: dict, last_check: datetime, today: datetime):
+        self.__setup = setup
+        self._last_check = last_check
+        self._today = today
+
+        self._data_name = setup["data_name"]
+        self._reference_value = self.__setup["reference_value"]
+        self._calculator_type = self.__setup["calculator_type"]
+
+        self._operator = MyOperator(setup["operator"])
+        self._comparator = MyComparator(setup["comparator"])
+
+        self.create_value_to_compare_interface()
+        self.create_data_period_generator()
+
+        self._data = None
+        self._value = None
+
+    def create_value_to_compare_interface(self):
+        if self._calculator_type == ValueToCompareModifier.VALUE:
+            self.__value_to_compare = PercentValue(percent=self._reference_value)
+        else:
+            self.__value_to_compare = FullValue()
+
+    def create_data_period_generator(self):
+        if self._calculator_type == ValueToCompareModifier.VALUE and self._operator is not MyOperator.AVERAGE:
+            self.__data_period_generator = LastCheckBasedPeriod(last_check=self._last_check, today=self._today)
+        else:
+            self.__data_period_generator = UserBasedPeriod(user_data=self.__setup["data_period"], today=self._today)
+
+    def __get_all_data_in_db(self, period):
+        all_data = [30, 45, 60]  # TODO : Link To DB
+        return all_data
+
+    # -- Find Data To Compare --
+    def __get_data(self):
+        """
+        get all data
+        """
+        period = self._get_data_period()
+        all_data = self.__get_all_data_in_db(period)
+        return self._operator.calculate(all_data)
+
+    def _get_data_period(self):
+        return self.__data_period_generator.get_pertinent_period()
+
+    # -- Find Value that will be Compare with Data --
+    def _get_comparative_value_from_reference(self):
+        if self._calculator_type == ValueToCompareModifier.VALUE:
+            return self._reference_value
+
+        value_type = self.__setup["value_type"]
+
+        value_generator: ValueGenerator
+
+        if value_type == ValueGenerator.PERIOD_BASED_VALUE:
+            value_generator = PeriodBasedValueGenerator(
+                conn_info={},
+                user_data=self.__setup["value_period"],
+                today=self._today
+            )
+        elif value_type == ValueGenerator.SIMPLE_DB_BASED_VALUE:
+            value_generator = SimpleDBBasedValueGenerator(conn_info={})
+
+        return value_generator.get_value()
+
+    def is_alert_situation(self):
+        self._data = self.__get_data()
+        self._value = self._get_comparative_value_from_reference()
+        return self._comparator.compare(self._data, self._value)
+
+
+# ---------------------------------------------------------------------------------------------------------------------
 
