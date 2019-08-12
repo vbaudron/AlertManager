@@ -4,7 +4,7 @@ from model import day
 
 
 class DayTypeError(Exception):
-    def __init__(self, wrong_value):
+    def __init__(self, wrong_value: object) -> object:
         print(self.__class__.__name__ + " has been created with wrong values : " + wrong_value)
         log.debug(self.__class__.__name__ + " has been created with wrong values : " + wrong_value)
         self.wrong_value = str(wrong_value)
