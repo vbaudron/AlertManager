@@ -25,24 +25,28 @@
             "comparator" : "SUP"
         }
     },
-    {
-        "name" : "alertDefinition3",
-        "id" : "id_3",
-        "calculator_type" : "PERCENT",
-        "calculator" : {
-            "data_name" : "consommation",
-            "operator" : "MAX",
-            "reference_value" : 15,
-            "data_period" : {
-                "quantity" : 2,
-                "unit" : "WEEK"
-            },
-            "value_type" : "PERIOD_BASED_VALUE",
-            "value_period" : {
-                "quantity" : 2,
-                "unit" : "WEEK"
-            },
-            "comparator" : "SUP"
-        }
-    }
+{
+  "name": "alertDefinition3",
+  "id": "id_3",
+  "calculator": {
+    "data": {
+      "data_name": "consommation",
+      "data_period": {
+        "quantity": 2,
+        "unit": "WEEK"
+      }
+    },
+    "value": {
+      "value_type": "PERIOD_BASED_VALUE",
+      "reference_value": 15,
+      "value_period": {
+        "quantity": 2,
+        "unit": "WEEK"
+      }
+    },
+    "comparator": "SUP"
+    "operator": "MAX",
+    "acceptable_diff" : true
+  }
+}
 ]

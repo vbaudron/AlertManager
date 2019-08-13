@@ -6,7 +6,9 @@ from unittest.mock import patch, MagicMock
 
 from model.day import Day
 from model.alert import AlertDefinition, AlertDefinitionFlag, Level, MyOperator, MyComparator, PeriodUnitDefinition, \
-    PercentBasedCalculator, PeriodDefinition, AlertCalculator
+    PeriodDefinition, AlertCalculator, LastCheckBasedPeriodGenerator, PeriodGenerator, Period, UserBasedPeriodGenerator, \
+    UserBasedValueGenerator, ValueGenerator, PeriodBasedValueGenerator, DataBaseValueGenerator, PeriodGeneratorType, \
+    ValueGeneratorType
 
 from model.alert import AlertDefinitionStatus
 from model.my_exception import DayTypeError
@@ -439,37 +441,174 @@ class PeriodDefinitionTest(unittest.TestCase):
             self.assertEqual(result, self.mock_return_value)
 
 
-class PercentBasedCalculatorTest(unittest.TestCase):
+class PeriodGeneratorTest(unittest.TestCase):
+
+    def setUp(self) -> None:
+        self.today = datetime(year=2019, month=8, day=13)
+
+    def test__last_check_based_period_generator(self):
+        last_check = datetime(year=2019, month=8, day=8)
+        last_check_based_period_generator = LastCheckBasedPeriodGenerator(last_check=last_check, today=self.today)
+        expected_period = Period(start=last_check, end=self.today)
+
+        self.assertIsInstance(last_check_based_period_generator, LastCheckBasedPeriodGenerator)
+        self.assertIsInstance(last_check_based_period_generator, PeriodGenerator)
+
+        result_period = last_check_based_period_generator.get_pertinent_period()
+
+        self.assertIsInstance(result_period, Period)
+        self.assertEqual(expected_period.get_start_date(), result_period.get_start_date())
+        self.assertEqual(expected_period.get_end_date(), result_period.get_end_date())
+
+    def test__user_based_period_generator(self):
+        user_data = {
+            "quantity": 5,
+            "unit": PeriodUnitDefinition.DAY.value
+        }
+        expected_start = datetime(year=2019, month=8, day=8)
+        user_based_period_generator = UserBasedPeriodGenerator(user_data=user_data, today=self.today)
+
+        self.assertIsInstance(user_based_period_generator, UserBasedPeriodGenerator)
+        self.assertIsInstance(user_based_period_generator, PeriodGenerator)
+
+        result_period = user_based_period_generator.get_pertinent_period()
+
+        self.assertIsInstance(result_period, Period)
+        self.assertEqual(expected_start, result_period.get_start_date())
+        self.assertEqual(self.today, result_period.get_end_date())
+
+
+class ValueGeneratorTest(unittest.TestCase):
+
+    def test__user_based_value_generator(self):
+        user_data = 5
+
+        user_based_value_generator = UserBasedValueGenerator(user_data=user_data)
+
+        self.assertIsInstance(user_based_value_generator, UserBasedValueGenerator)
+        self.assertIsInstance(user_based_value_generator, ValueGenerator)
+
+        self.assertEqual(user_based_value_generator.get_value(), user_data)
+
+    def test__period_based_value_generator(self):
+        conn_info = {}
+        user_data = {
+            "quantity": 5,
+            "unit": PeriodUnitDefinition.DAY.value
+        }
+        today = datetime(year=2019, month=8, day=13)
+
+        period_based_value_generator = PeriodBasedValueGenerator(conn_info=conn_info, user_data=user_data, today=today)
+
+        self.assertIsInstance(period_based_value_generator, PeriodBasedValueGenerator)
+        self.assertIsInstance(period_based_value_generator, DataBaseValueGenerator)
+        self.assertIsInstance(period_based_value_generator, ValueGenerator)
+
+        # -- GENERATE PERIOD --
+        with patch("model.alert.PeriodBasedValueGenerator.generate_period") as mock:
+            period_based_value_generator = PeriodBasedValueGenerator(
+                conn_info=conn_info,
+                user_data=user_data,
+                today=today)
+            mock.assert_called_with(user_data=user_data, today=today)
+
+        # Period Generator
+        with patch("model.alert.UserBasedPeriodGenerator") as mock:
+            period_based_value_generator = PeriodBasedValueGenerator(
+                conn_info=conn_info,
+                user_data=user_data,
+                today=today)
+            mock.assert_called_with(user_data=user_data, today=today)
+
+        # Period
+        with patch("model.alert.PeriodGenerator.get_pertinent_period") as mock:
+            period_based_value_generator = PeriodBasedValueGenerator(
+                conn_info=conn_info,
+                user_data=user_data,
+                today=today)
+            mock.assert_called()
+
+
+class AlertCalculatorTest(unittest.TestCase):
 
     def setUp(self):
-        self.data_name = "consommation"
+        # -- Setup Info --
+
+        # general
         self.operator = MyOperator.MAX
         self.comparator = MyComparator.SUP
-        self.reference_value = 15
-        self.data = None
-        self.value = None
-        self.percent_period = "YEAR"
+        self.acceptable_diff = True
+
+        # data
+        self.data_name = "consommation"
+        self.data_period_type = PeriodGeneratorType.USER_BASED
+
+        # value
+        self.value_number = 15
+        self.value_generator_type = ValueGeneratorType.PERIOD_BASED_VALUE
+
+        # Period
         self.period_unit = PeriodUnitDefinition.DAY
         self.period_quantity = 1
+
+        # -- Generate setup --
         self.generate_setup()
 
+        # -- Datetime --
+        self.data = None
+        self.value = None
+
+        # -- Datetime --
+        self.today = datetime(year=2019, month=8, day=13)
+        self.last_check = datetime(year=2019, month=8, day=8)
+
     def generate_setup(self):
-        self.setup = {
+        # -- Data --
+        data = {
             "data_name": self.data_name,
-            "operator": self.operator.value,
-            "reference_value": self.reference_value,
-            "percent_period": self.percent_period,
-            "comparator": str(self.comparator.value),
-            "data_period": {
+            "data_period_type": self.data_period_type.value
+        }
+
+        if self.data_period_type is PeriodGeneratorType.USER_BASED:
+            data["data_period"] = {
                 "quantity": self.period_quantity,
                 "unit": self.period_unit.value
             }
+
+        # -- Value --
+        value = {
+            "value_number": self.value_number,
+            "value_type": self.value_generator_type.value
+        }
+
+        if self.value_generator_type is ValueGeneratorType.PERIOD_BASED_VALUE:
+            value["value_period"] = {
+                "quantity": self.period_quantity,
+                "unit": self.period_unit.value
+            }
+
+        # -- SETUP --
+        self.setup = {
+            "data": data,
+            "value": value,
+            "operator": self.operator.value,
+            "acceptable_diff": self.acceptable_diff,
+            "comparator": self.comparator.value
         }
 
     def test__init(self):
-        percent_calculator = PercentBasedCalculator(self.setup)
-        self.assertIsInstance(percent_calculator, PercentBasedCalculator)
-        self.assertIsInstance(percent_calculator, AlertCalculator)
+        alert_calculator = AlertCalculator(
+            setup=self.setup,
+            last_check=self.last_check,
+            today=self.today
+        )
+
+        self.assertIsInstance(alert_calculator, AlertCalculator)
+
+        # Attributes
+        self.assertEqual(self.data_name, alert_calculator.data_name)
+
+
 
 
   #  def test__get_comparative_value_from_reference(self):

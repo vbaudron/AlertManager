@@ -231,42 +231,58 @@ class MyOperator(Enum):
 
 # --------------------------------------------------   COMPARATOR   ----------------------------------------------------
 
-def is_sup(data, value):
+# Compare
+def is_sup(data: float, value: float) -> bool:
     return data > value
 
 
-def is_inf(data, value):
+def is_inf(data: float, value: float) -> bool:
     return data < value
 
 
-def equal(data, value):
+def equal(data: float, value: float) -> bool:
     return data == value
+
+
+# Apply Percent to value
+def new_sup_value(value: float, percent: int) -> float:
+    return value * (1 + (percent/100))
+
+
+def new_inf_value(value: float, percent: int) -> float:
+    return value * (1 - (percent/100))
+
+
+def new_equal_value(value: float, percent: int) -> float:
+    return value
 
 
 # CLASS
 class MyComparator(Enum):
-    SUP = "SUP", is_sup
-    INF = "INF", is_inf
-    EQUAL = "EQUAL", equal
+    SUP = "SUP", is_sup, new_sup_value
+    INF = "INF", is_inf, new_inf_value
+    EQUAL = "EQUAL", equal, new_equal_value
 
-    def __new__(cls, str_name, method):
+    def __new__(cls, str_name, method, method_with_percent):
         obj = object.__new__(cls)
         obj._value_ = str_name
         obj.compare = method
+        obj.get_new_value = method_with_percent
         return obj
 
 
 # -------------------------------------------------   PERIOD Class   ---------------------------------------------------
 
-def go_past_with_days(end_date: datetime, quantity):
+
+def go_past_with_days(end_date: datetime, quantity: int) -> datetime:
     return end_date - timedelta(days=quantity)
 
 
-def go_past_with_weeks(end_date: datetime, quantity):
+def go_past_with_weeks(end_date: datetime, quantity: int) -> datetime:
     return end_date - timedelta(weeks=quantity)
 
 
-def go_past_with_months(end_date: datetime, quantity):
+def go_past_with_months(end_date: datetime, quantity: int) -> datetime:
     new_year = end_date.year
     if quantity >= 12:
         year = quantity // 12
@@ -283,7 +299,7 @@ def go_past_with_months(end_date: datetime, quantity):
     return datetime(year=new_year, month=new_month, day=new_day)
 
 
-def go_past_with_years(end_date: datetime, quantity):
+def go_past_with_years(end_date: datetime, quantity: int) -> datetime:
     new_year = end_date.year - quantity
     last_day_of_month = calendar.monthrange(new_year, end_date.month)[1]
     new_day = min(end_date.day, last_day_of_month)
@@ -326,6 +342,7 @@ class PeriodDefinition:
     def get_quantity(self):
         return self._quantity
 
+
 # CLASS
 class Period:
     """
@@ -349,8 +366,16 @@ class Period:
 # ---------------------------------------------------   FACTORY   ------------------------------------------------------
 
 
-# -------------- [ PERIOD ] --------------
+# -------------- [ PERIOD GENERATOR ] --------------
 
+# -- Enum
+@unique
+class PeriodGeneratorType(Enum):
+    LAST_CHECK = "LAST_CHECK"
+    USER_BASED = "USER_BASED"
+
+
+# -- class
 class PeriodGenerator(ABC):
 
     _period: Period
@@ -359,14 +384,14 @@ class PeriodGenerator(ABC):
         return self._period
 
 
-class LastCheckBasedPeriod(PeriodGenerator):
+class LastCheckBasedPeriodGenerator(PeriodGenerator):
 
     def __init__(self, last_check: datetime, today: datetime) -> None:
         super().__init__()
         self._period = Period(start=last_check, end=today)
 
 
-class UserBasedPeriod(PeriodGenerator):
+class UserBasedPeriodGenerator(PeriodGenerator):
 
     __period_definition: PeriodDefinition
 
@@ -377,52 +402,25 @@ class UserBasedPeriod(PeriodGenerator):
 
     def generate_period_definition(self, unit: str, quantity: int):
         period_unit = PeriodUnitDefinition(unit)
-        self.__period_definition = PeriodDefinition(period_unit=period_unit, quantity=quantity)
+        self.__period_definition = PeriodDefinition(unit=period_unit, quantity=quantity)
 
     def generate_period(self, today: datetime):
         start_date = self.__period_definition.get_start_date_from_end_date(end_date=today)
         self._period = Period(start=start_date, end=today)
 
 
-class NoPeriodBased(PeriodGenerator):
-    def __init__(self, user_data: dict) -> None:
-        super().__init__()
-        self._period = None
+# -------------- [ VALUE GENERATOR ] --------------
 
-
-# -------------- [ PERCENT VALUE ] --------------
-
-class ValueToCompareModifier(ABC):
-
-    PERCENT = "PERCENT"
-    VALUE = "VALUE"
-
-    _percent: int
-
-    def calculate_value_to_compare(self, value_base) -> "value to compare data with":
-        return (self._percent / 100) * value_base
-
-
-class FullValue(ValueToCompareModifier):
-
-    def __init__(self) -> None:
-        super().__init__()
-        self._percent = 100
-
-
-class PercentValue(ValueToCompareModifier):
-
-    def __init__(self, percent) -> None:
-        super().__init__()
-        self._percent = percent
-
-
-# -------------- [ VALUE GENERATOR] --------------
-
-class ValueGenerator(ABC):
-
+# -- Enum
+@unique
+class ValueGeneratorType(Enum):
+    USER_BASED_VALUE = "USER_BASED_VALUE"
     SIMPLE_DB_BASED_VALUE = "SIMPLE_DB_BASED_VALUE"
     PERIOD_BASED_VALUE = "PERIOD_BASED_VALUE"
+
+
+# -- class
+class ValueGenerator(ABC):
 
     _value: float
 
@@ -430,14 +428,14 @@ class ValueGenerator(ABC):
         return self._value
 
 
-class UserBaseValueGenerator(ValueGenerator):
+class UserBasedValueGenerator(ValueGenerator):
 
     def __init__(self, user_data: int) -> None:
         super().__init__()
         self._value = user_data
 
 
-class DataBaseValue(ABC, ValueGenerator):
+class DataBaseValueGenerator(ValueGenerator, ABC):
 
     def __init__(self, conn_info: dict) -> None:
         super().__init__()
@@ -451,7 +449,7 @@ class DataBaseValue(ABC, ValueGenerator):
         raise NotImplementedError
 
 
-class SimpleDBBasedValueGenerator(DataBaseValue): # GOAL
+class SimpleDBBasedValueGenerator(DataBaseValueGenerator): # GOAL
 
     def __init__(self, conn_info: dict) -> None:
         super().__init__(conn_info=conn_info)
@@ -461,7 +459,7 @@ class SimpleDBBasedValueGenerator(DataBaseValue): # GOAL
         pass #TODO
 
 
-class PeriodBasedValueGenerator(DataBaseValue):
+class PeriodBasedValueGenerator(DataBaseValueGenerator):
 
     __period: Period
 
@@ -471,99 +469,121 @@ class PeriodBasedValueGenerator(DataBaseValue):
         self.get_value_in_db()
 
     def generate_period(self, user_data: dict, today: datetime):
-        period_generator = UserBasedPeriod(user_data=user_data, today=today)
+        period_generator = UserBasedPeriodGenerator(user_data=user_data, today=today)
         self.__period = period_generator.get_pertinent_period()
-
 
     def get_value_in_db(self):
         pass  # TODO
+
+
+class NoPeriodBasedValueGenerator(ValueGenerator):
+    def __init__(self, value: int) -> None:
+        super().__init__()
+        self._value = value
 
 
 # ------------------ [ FACTORY Class ] ---------------------
 
 class AlertCalculator:
 
-    __data_period_generator: PeriodGenerator
-    __value_to_compare: ValueToCompareModifier  # TODO
-
     __setup: dict
-    _data_name: str
+
+    # datetime
+    _last_check: datetime
+    _today: datetime
+
+    # general
+    _acceptable_diff: bool
     _operator: MyOperator
     _comparator: MyComparator
-    _reference_value: int
+
+    # data
+    _data_name: str
+    _data_period_type: PeriodGeneratorType
+    __data_period_generator: PeriodGenerator
     _data: float  # data to check - calculated from data_name
+
+    # value
+    _value_generator_type: ValueGeneratorType
+    value_generator: ValueGenerator
+    value_number: int
     _value: float  # value to compare with
 
     def __init__(self, setup: dict, last_check: datetime, today: datetime):
         self.__setup = setup
+
         self._last_check = last_check
         self._today = today
 
-        self._data_name = setup["data_name"]
-        self._reference_value = self.__setup["reference_value"]
-        self._calculator_type = self.__setup["calculator_type"]
-
+        self._acceptable_diff = setup["acceptable_diff"]
         self._operator = MyOperator(setup["operator"])
         self._comparator = MyComparator(setup["comparator"])
-
-        self.create_value_to_compare_interface()
-        self.create_data_period_generator()
 
         self._data = None
         self._value = None
 
-    def create_value_to_compare_interface(self):
-        if self._calculator_type == ValueToCompareModifier.VALUE:
-            self.__value_to_compare = PercentValue(percent=self._reference_value)
-        else:
-            self.__value_to_compare = FullValue()
+        self.set_data_info()
+        self.set_value_info()
 
-    def create_data_period_generator(self):
-        if self._calculator_type == ValueToCompareModifier.VALUE and self._operator is not MyOperator.AVERAGE:
-            self.__data_period_generator = LastCheckBasedPeriod(last_check=self._last_check, today=self._today)
-        else:
-            self.__data_period_generator = UserBasedPeriod(user_data=self.__setup["data_period"], today=self._today)
+    # Set Data Info
+    def set_data_info(self):
+        # Get data From Setup
+        data_setup = self.__setup["data"]
 
-    def __get_all_data_in_db(self, period):
-        all_data = [30, 45, 60]  # TODO : Link To DB
-        return all_data
+        self._data_name = data_setup["data_name"]
+        self._data_period_type = PeriodGeneratorType(data_setup["data_period_type"])
+
+        # Set Factory
+        if self._data_period_type is PeriodGeneratorType.LAST_CHECK:
+            self.__data_period_generator = LastCheckBasedPeriodGenerator(last_check=self._last_check, today=self._today)
+        elif self._data_period_type is PeriodGeneratorType.USER_BASED:
+            self.__data_period_generator = UserBasedPeriodGenerator(user_data=data_setup["data_period"],
+                                                                    today=self._today)
+
+    # Set Value info
+    def set_value_info(self):
+        # Get value From Setup
+        value_setup = self.__setup["value"]
+        self.value_number = value_setup["value_number"]
+        self._value_generator_type = ValueGeneratorType(value_setup["value_type"])
+
+        # Set Factory
+        if self._value_generator_type is ValueGeneratorType.USER_BASED_VALUE:
+            self.value_generator == NoPeriodBasedValueGenerator(self.value_number)
+        elif self._value_generator_type is ValueGeneratorType.PERIOD_BASED_VALUE:
+            self.value_generator = PeriodBasedValueGenerator(
+                conn_info={},
+                user_data=value_setup["value_period"],
+                today=self._today
+            )
+        elif self._value_generator_type is ValueGeneratorType.SIMPLE_DB_BASED_VALUE:
+            self.value_generator = SimpleDBBasedValueGenerator(conn_info={})
 
     # -- Find Data To Compare --
     def __get_data(self):
         """
         get all data
         """
-        period = self._get_data_period()
+        period = self.__data_period_generator.get_pertinent_period()
         all_data = self.__get_all_data_in_db(period)
         return self._operator.calculate(all_data)
 
-    def _get_data_period(self):
-        return self.__data_period_generator.get_pertinent_period()
+    def __get_all_data_in_db(self, period):
+        start_date = period.get_start_date()
+        all_data = [30, 45, 60]  # TODO : Link To DB
+        return all_data
 
     # -- Find Value that will be Compare with Data --
-    def _get_comparative_value_from_reference(self):
-        if self._calculator_type == ValueToCompareModifier.VALUE:
-            return self._reference_value
-
-        value_type = self.__setup["value_type"]
-
-        value_generator: ValueGenerator
-
-        if value_type == ValueGenerator.PERIOD_BASED_VALUE:
-            value_generator = PeriodBasedValueGenerator(
-                conn_info={},
-                user_data=self.__setup["value_period"],
-                today=self._today
-            )
-        elif value_type == ValueGenerator.SIMPLE_DB_BASED_VALUE:
-            value_generator = SimpleDBBasedValueGenerator(conn_info={})
-
-        return value_generator.get_value()
+    def __get_value(self):
+        if self._acceptable_diff:
+            self._value = self._comparator.get_new_value(value=self._value, percent=self.value_number)
+        return self.value_generator.get_value()
 
     def is_alert_situation(self):
         self._data = self.__get_data()
-        self._value = self._get_comparative_value_from_reference()
+        self._value = self.__get_value()
         return self._comparator.compare(self._data, self._value)
+
 
 
 # ---------------------------------------------------------------------------------------------------------------------
