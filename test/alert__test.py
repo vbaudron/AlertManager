@@ -8,10 +8,64 @@ from model.day import Day
 from model.alert import AlertDefinition, AlertDefinitionFlag, Level, MyOperator, MyComparator, PeriodUnitDefinition, \
     PeriodDefinition, AlertCalculator, LastCheckBasedPeriodGenerator, PeriodGenerator, Period, UserBasedPeriodGenerator, \
     UserBasedValueGenerator, ValueGenerator, PeriodBasedValueGenerator, DataBaseValueGenerator, PeriodGeneratorType, \
-    ValueGeneratorType
+    ValueGeneratorType, NoPeriodBasedValueGenerator, SimpleDBBasedValueGenerator, AlertData, AlertValue, \
+    AlertNotification, NotificationPeriod
 
 from model.alert import AlertDefinitionStatus
 from model.my_exception import DayTypeError
+
+class NotificationTest(unittest.TestCase):
+    def setUp(self) -> None:
+        self.number = 1
+        self.period = NotificationPeriod.DAY
+        self.email = "test@test.com"
+        self.generate_setup()
+
+    def generate_setup(self):
+        self.setup = {
+            "number": self.number,
+            "period": self.period.value,
+            "email": self.email
+        }
+
+    def update_and_generate_alert_notification(self) -> AlertNotification:
+        self.generate_setup()
+        return self.get_alert_notification()
+
+    def get_alert_notification(self) -> AlertNotification:
+        return AlertNotification(self.setup)
+
+    def test__init(self):
+        notification = AlertNotification(self.setup)
+        self.assertIsInstance(notification, AlertNotification)
+        self.assertEqual(notification.number, self.number)
+        self.assertEqual(notification.email, self.email)
+        self.assertIsInstance(notification.period, NotificationPeriod)
+        self.assertEqual(notification.period, self.period)
+
+        with patch("model.alert.NotificationPeriod") as mock:
+            self.get_alert_notification()
+            mock.assert_called_with(self.period.value)
+
+    def test__is_notification_allowed(self):
+        today = datetime(2019, 7, 29)
+        yesterday = datetime(2019, 7, 28)
+        twenty_days_ago = datetime(2019, 7, 9)
+        fourty_days_ago = today - timedelta(days=40)
+
+        # 2 DAY
+        self.number = 2
+        notification = self.update_and_generate_alert_notification()
+        self.assertFalse(notification.is_notification_allowed(yesterday, today))
+        self.assertTrue(notification.is_notification_allowed(twenty_days_ago, today))
+
+        # MONTH
+        self.number = 1
+        self.period = NotificationPeriod.MONTH
+        notification = self.update_and_generate_alert_notification()
+        self.assertFalse(notification.is_notification_allowed(yesterday, today))
+        self.assertFalse(notification.is_notification_allowed(twenty_days_ago, today))
+        self.assertTrue(notification.is_notification_allowed(fourty_days_ago, today))
 
 
 class AlertDefinitionTest(unittest.TestCase):
@@ -488,7 +542,7 @@ class ValueGeneratorTest(unittest.TestCase):
         self.assertIsInstance(user_based_value_generator, UserBasedValueGenerator)
         self.assertIsInstance(user_based_value_generator, ValueGenerator)
 
-        self.assertEqual(user_based_value_generator.get_value(), user_data)
+        self.assertEqual(user_based_value_generator.value, user_data)
 
     def test__period_based_value_generator(self):
         conn_info = {}
@@ -529,6 +583,161 @@ class ValueGeneratorTest(unittest.TestCase):
             mock.assert_called()
 
 
+class AlertDatatest(unittest.TestCase):
+
+    def setUp(self) -> None:
+
+        # data
+        self.data_name = "consommation"
+        self.data_period_type = PeriodGeneratorType.USER_BASED
+
+        # Period
+        self.period_unit = PeriodUnitDefinition.DAY
+        self.period_quantity = 1
+
+        # datetime
+        self.today = datetime(year=2019, month=8, day=13)
+        self.last_check = datetime(year=2019, month=8, day=8)
+
+    def generate_setup(self):
+        # -- Data --
+        self.setup = {
+            "data_name": self.data_name,
+            "data_period_type": self.data_period_type.value
+        }
+
+        if self.data_period_type is PeriodGeneratorType.USER_BASED:
+            self.setup["data_period"] = {
+                "quantity": self.period_quantity,
+                "unit": self.period_unit.value
+            }
+
+    def update_and_get_new_alert_data(self):
+        self.generate_setup()
+        return self.generate_alert_data()
+
+    def generate_alert_data(self):
+        return AlertData(setup=self.setup, last_check=self.last_check, today=self.today)
+
+    def test__init(self):
+        alert_data: AlertData = self.update_and_get_new_alert_data()
+
+        self.assertIsInstance(alert_data, AlertData)
+
+        self.assertEqual(self.data_name, alert_data.data_name)
+        self.assertEqual(self.data_period_type, alert_data.data_period_type)
+
+    def test__data_period_generator(self):
+        # -- LAST CHECK --
+        # Instance created
+        self.data_period_type = PeriodGeneratorType.LAST_CHECK
+
+        alert_data: AlertData = self.update_and_get_new_alert_data()
+        self.assertIsInstance(alert_data.data_period_generator, LastCheckBasedPeriodGenerator)
+
+        # Pertinent parameters
+        with patch("model.alert.LastCheckBasedPeriodGenerator") as mock:
+            self.generate_alert_data()
+            mock.assert_called_with(last_check=self.last_check, today=self.today)
+
+        # -- USER BASED --
+        # Instance created
+        self.data_period_type = PeriodGeneratorType.USER_BASED
+
+        alert_data = self.update_and_get_new_alert_data()
+        self.assertIsInstance(alert_data.data_period_generator, UserBasedPeriodGenerator)
+
+        # Pertinent parameters
+        with patch("model.alert.UserBasedPeriodGenerator") as mock:
+            self.generate_alert_data()
+            mock.assert_called_with(user_data=self.setup["data_period"], today=self.today)
+
+        # -- ERROR -- TODO
+
+
+class AlertValueTest(unittest.TestCase):
+
+    def setUp(self) -> None:
+
+        # value
+        self.value_number = 15
+        self.value_generator_type = ValueGeneratorType.PERIOD_BASED_VALUE
+
+        # Period
+        self.period_unit = PeriodUnitDefinition.DAY
+        self.period_quantity = 1
+
+        # datetime
+        self.today = datetime(year=2019, month=8, day=13)
+
+    def generate_setup(self):
+        # -- Value --
+        self.setup = {
+            "value_number": self.value_number,
+            "value_type": self.value_generator_type.value
+        }
+
+        if self.value_generator_type is ValueGeneratorType.PERIOD_BASED_VALUE:
+            self.setup["value_period"] = {
+                "quantity": self.period_quantity,
+                "unit": self.period_unit.value
+            }
+
+    def update_and_get_new_alert_value(self):
+        self.generate_setup()
+        return self.generate_alert_value()
+
+    def generate_alert_value(self):
+        return AlertValue(setup=self.setup, today=self.today)
+
+    def test__init(self):
+        alert_value: AlertValue = self.update_and_get_new_alert_value()
+
+        self.assertIsInstance(alert_value, AlertValue)
+
+        self.assertEqual(self.value_number, alert_value.value_number)
+        self.assertEqual(self.value_generator_type, alert_value.value_generator_type)
+
+    def test__value_generator(self):
+        # -- SIMPLE DB --
+        # Instance created
+        self.value_generator_type = ValueGeneratorType.SIMPLE_DB_BASED_VALUE
+
+        alert_value: AlertValue = self.update_and_get_new_alert_value()
+        self.assertIsInstance(alert_value.value_generator, SimpleDBBasedValueGenerator)
+
+        # Pertinent parameters
+        with patch("model.alert.SimpleDBBasedValueGenerator") as mock:
+            self.generate_alert_value()
+            mock.assert_called_with(conn_info={})
+
+        # -- PERIOD BASED VALUE --
+        # Instance created
+        self.value_generator_type = ValueGeneratorType.PERIOD_BASED_VALUE
+
+        alert_value = self.update_and_get_new_alert_value()
+        self.assertIsInstance(alert_value.value_generator, PeriodBasedValueGenerator)
+
+        # Pertinent parameters
+        with patch("model.alert.PeriodBasedValueGenerator") as mock:
+            self.generate_alert_value()
+            mock.assert_called_with(conn_info={}, user_data=self.setup["value_period"], today=self.today)
+
+        # -- USER BASED VALUE --
+        # Instance created
+        self.value_generator_type = ValueGeneratorType.USER_BASED_VALUE
+
+        alert_value = self.update_and_get_new_alert_value()
+        self.assertIsInstance(alert_value.value_generator, NoPeriodBasedValueGenerator)
+
+        # Pertinent parameters
+        with patch("model.alert.NoPeriodBasedValueGenerator") as mock:
+            self.generate_alert_value()
+            mock.assert_called_with(value=self.value_number)
+
+        # -- ERROR -- TODO
+
+
 class AlertCalculatorTest(unittest.TestCase):
 
     def setUp(self):
@@ -554,7 +763,7 @@ class AlertCalculatorTest(unittest.TestCase):
         # -- Generate setup --
         self.generate_setup()
 
-        # -- Datetime --
+        # -- RESULT --
         self.data = None
         self.value = None
 
@@ -564,57 +773,91 @@ class AlertCalculatorTest(unittest.TestCase):
 
     def generate_setup(self):
         # -- Data --
-        data = {
+        self.data_setup = {
             "data_name": self.data_name,
             "data_period_type": self.data_period_type.value
         }
 
         if self.data_period_type is PeriodGeneratorType.USER_BASED:
-            data["data_period"] = {
+            self.data_setup["data_period"] = {
                 "quantity": self.period_quantity,
                 "unit": self.period_unit.value
             }
 
         # -- Value --
-        value = {
+        self.value_setup = {
             "value_number": self.value_number,
             "value_type": self.value_generator_type.value
         }
 
         if self.value_generator_type is ValueGeneratorType.PERIOD_BASED_VALUE:
-            value["value_period"] = {
+            self.value_setup["value_period"] = {
                 "quantity": self.period_quantity,
                 "unit": self.period_unit.value
             }
 
         # -- SETUP --
         self.setup = {
-            "data": data,
-            "value": value,
+            "data": self.data_setup,
+            "value": self.value_setup,
             "operator": self.operator.value,
             "acceptable_diff": self.acceptable_diff,
             "comparator": self.comparator.value
         }
 
-    def test__init(self):
-        alert_calculator = AlertCalculator(
+    def get_alert_calculator(self) -> AlertCalculator:
+        return AlertCalculator(
             setup=self.setup,
             last_check=self.last_check,
             today=self.today
         )
 
+    def update_and_get_new_alert_calculator(self) -> AlertCalculator:
+        self.generate_setup()
+        return self.get_alert_calculator()
+
+    def test__init(self):
+        alert_calculator = self.update_and_get_new_alert_calculator()
+
         self.assertIsInstance(alert_calculator, AlertCalculator)
 
-        # Attributes
-        self.assertEqual(self.data_name, alert_calculator.data_name)
+        # assert Attributes
+        self.assertEqual(self.setup, alert_calculator.setup)
+        self.assertEqual(self.operator, alert_calculator.operator)
+        self.assertEqual(self.comparator, alert_calculator.comparator)
+        self.assertEqual(self.acceptable_diff, alert_calculator.acceptable_diff)
+        # datetime
+        self.assertEqual(self.today, alert_calculator.today)
+        self.assertEqual(self.last_check, alert_calculator.last_check)
+        # data
+        self.assertIsInstance(alert_calculator.alert_data, AlertData)
+        # value
+        self.assertIsInstance(alert_calculator.alert_value, AlertValue)
 
+        # -- Pertinent parameters --
 
+        # data
+        with patch("model.alert.AlertData") as mock:
+            self.get_alert_calculator()
+            mock.assert_called_with(setup=self.setup["data"], last_check=self.last_check, today=self.today)
 
+        # value
+        with patch("model.alert.AlertValue") as mock:
+            self.get_alert_calculator()
+            mock.assert_called_with(setup=self.setup["value"], today=self.today)
 
-  #  def test__get_comparative_value_from_reference(self):
-      #  percent_calculator = PercentBasedCalculator(self.setup)
+        # -- ERROR -- TODO
 
-
+    def test__is_alert__get_data(self):
+        todo = True  #TODO
+        # -- PERIOD BASED --
+        #
+        # alert_calculator = self.get_alert_calculator()
+        #
+        # # Pertinent parameters
+        # with patch("model.alert.AlertCalculator.__get_data", return_value=2) as mock:
+        #     alert_calculator.is_alert_situation()
+        #     mock.assert_called()
 
 
 

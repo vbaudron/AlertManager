@@ -1,30 +1,4 @@
 [
-    {
-        "name" : "alertDefinition1",
-        "id" : "id_1",
-        "calculator_type" : "PERCENT",
-        "calculator" : {
-            "data_name" : "consommation",
-            "operator" : "AVERAGE",
-            "data_period" : {
-                "quantity" : 5,
-                "unit" : "DAY"
-            },
-            "reference_value" : 50,
-            "comparator" : "SUP"
-        }
-    },
-    {
-        "name" : "alertDefinition2",
-        "id" : "id_2",
-        "calculator_type" : "PERCENT",
-        "calculator" : {
-            "data_name" : "consommation",
-            "operator" : "MAX",
-            "reference_value" : 50,
-            "comparator" : "SUP"
-        }
-    },
 {
   "name": "alertDefinition3",
   "id": "id_3",
@@ -44,9 +18,14 @@
         "unit": "WEEK"
       }
     },
-    "comparator": "SUP"
+    "comparator": "SUP",
     "operator": "MAX",
     "acceptable_diff" : true
+  },
+  "notification": {
+    "period": "DAY",
+    "number": 2,
+    "email": "virginie.baudron@gmail.com"
   }
 }
 ]
