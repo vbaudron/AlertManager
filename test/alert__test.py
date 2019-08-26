@@ -943,7 +943,7 @@ class AlertDatatest(unittest.TestCase):
     def generate_setup(self):
         # -- Data --
         self.setup = {
-            "data_period_type": self.data_period_type.value
+            "data_period_type": self.data_period_type.name
         }
 
         if self.data_period_type is PeriodGeneratorType.USER_BASED:
@@ -1013,7 +1013,7 @@ class AlertValueTest(unittest.TestCase):
         # -- Value --
         self.setup = {
             "value_number": self.value_number,
-            "value_type": self.value_generator_type.value
+            "value_type": self.value_generator_type.name
         }
 
         if self.value_generator_type is ValueGeneratorType.PERIOD_BASED_VALUE:
@@ -1112,7 +1112,7 @@ class AlertCalculatorTest(unittest.TestCase):
     def generate_setup(self):
         # -- Data --
         self.data_setup = {
-            "data_period_type": self.data_period_type.value
+            "data_period_type": self.data_period_type.name
         }
 
         if self.data_period_type is PeriodGeneratorType.USER_BASED:
@@ -1124,7 +1124,7 @@ class AlertCalculatorTest(unittest.TestCase):
         # -- Value --
         self.value_setup = {
             "value_number": self.value_number,
-            "value_type": self.value_generator_type.value
+            "value_type": self.value_generator_type.name
         }
 
         if self.value_generator_type is ValueGeneratorType.PERIOD_BASED_VALUE:
