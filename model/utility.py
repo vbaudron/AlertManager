@@ -2,6 +2,8 @@ import calendar
 import json
 import os.path
 import sys
+from enum import Enum
+import logging as log
 from typing import Any, Union
 
 import mysql.connector
@@ -11,8 +13,29 @@ import datetime
 DATA_FOLDER_NAME = "data"
 SOURCE_FOLDER_NAME = "source"
 
-def get_day_name_from_datetime(datetime):
-    return calendar.day_name[datetime.weekday()]
+
+class MyEnum(Enum):
+    @staticmethod
+    def str_values(cls):
+        my_str = ""
+        for name, member in cls.__members__.items():
+            my_str += "'{0}' : {1}    ".format(name, member.value)
+        return my_str
+
+
+def enum_str_values(enum: Enum) -> "Str of each member of the enum":
+    my_str = ""
+    for name, member in enum.__members__.items():
+        my_str += "'{0}' : {1}    ".format(name, member.value)
+    return my_str
+
+
+def get_day_name_from_datetime(my_datetime: datetime) -> "day Name":
+    try:
+        return calendar.day_name[my_datetime.weekday()]
+    except KeyError as error:
+        log.error(error.__str__())
+
 
 
 def get_dict_from_json_file(file_path_name):

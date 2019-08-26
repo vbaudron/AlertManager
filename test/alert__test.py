@@ -4,28 +4,44 @@ import unittest
 from datetime import datetime, timedelta
 from unittest.mock import patch, MagicMock
 
-from model.day import Day
 from model.alert import AlertDefinition, AlertDefinitionFlag, Level, MyOperator, MyComparator, PeriodUnitDefinition, \
     PeriodDefinition, AlertCalculator, LastCheckBasedPeriodGenerator, PeriodGenerator, Period, UserBasedPeriodGenerator, \
     UserBasedValueGenerator, ValueGenerator, PeriodBasedValueGenerator, DataBaseValueGenerator, PeriodGeneratorType, \
     ValueGeneratorType, NoPeriodBasedValueGenerator, SimpleDBBasedValueGenerator, AlertData, AlertValue, \
-    AlertNotification, NotificationPeriod
+    AlertNotification, NotificationPeriod, Day, Hour
 
 from model.alert import AlertDefinitionStatus
-from model.my_exception import DayTypeError
+from model.my_exception import EnumError
+
 
 class NotificationTest(unittest.TestCase):
+
+    setup: dict
+
     def setUp(self) -> None:
+
+        self.monday = datetime(2019, 7, 29)  # 29 July 2019 was a MONDAY
+        self.saturday = datetime(2019, 7, 27)  # 27 July 2019 was a SATURDAY
+
         self.number = 1
         self.period = NotificationPeriod.DAY
         self.email = "test@test.com"
-        self.generate_setup()
+        self.notification_days = [
+            Day.MONDAY, Day.TUESDAY
+        ]
+        self.notification_hours = [
+            Hour.H_1, Hour.H_2
+        ]
+        self.previous_notification_datetime = None
 
     def generate_setup(self):
         self.setup = {
             "number": self.number,
-            "period": self.period.value,
-            "email": self.email
+            "period": self.period.name,
+            "email": self.email,
+            "notification_days": [day.name for day in self.notification_days],
+            "notification_hours": [hour.int_hour for hour in self.notification_hours],
+            "previous_notification_datetime": self.previous_notification_datetime
         }
 
     def update_and_generate_alert_notification(self) -> AlertNotification:
@@ -35,215 +51,539 @@ class NotificationTest(unittest.TestCase):
     def get_alert_notification(self) -> AlertNotification:
         return AlertNotification(self.setup)
 
+    # INIT
     def test__init(self):
-        notification = AlertNotification(self.setup)
+        notification = self.update_and_generate_alert_notification()
         self.assertIsInstance(notification, AlertNotification)
         self.assertEqual(notification.number, self.number)
         self.assertEqual(notification.email, self.email)
         self.assertIsInstance(notification.period, NotificationPeriod)
         self.assertEqual(notification.period, self.period)
 
-        with patch("model.alert.NotificationPeriod") as mock:
-            self.get_alert_notification()
-            mock.assert_called_with(self.period.value)
+    # --  DAY --
 
-    def test__is_notification_allowed(self):
+    def test__has_day_in_notification_days(self):
+        to_have_day = Day.MONDAY
+        not_to_have_day = Day.TUESDAY
+
+        self.notification_days = [to_have_day]
+        alert_notification = self.update_and_generate_alert_notification()
+
+        self.assertTrue(alert_notification.has_day_in_notification_days(to_have_day))
+        self.assertFalse(alert_notification.has_day_in_notification_days(not_to_have_day))
+
+        # Test in Multiples Flags
+        another_day_to_have = Day.SATURDAY
+        self.notification_days = [to_have_day, another_day_to_have]
+        alert_notification = self.update_and_generate_alert_notification()
+        self.assertTrue(alert_notification.has_day_in_notification_days(day=to_have_day))
+        self.assertFalse(alert_notification.has_day_in_notification_days(day=not_to_have_day))
+        self.assertTrue(alert_notification.has_day_in_notification_days(day=another_day_to_have))
+
+        # ERROR : Not a Day
+        wrong_day = "iam no day"
+        error = EnumError(except_enum=Day, wrong_value=wrong_day)
+
+        with patch("logging.error") as mock:
+            self.assertFalse(alert_notification.has_day_in_notification_days(day=wrong_day))
+            mock.assert_called_with(error.__str__())
+
+    def test__add_day_to_notification_days(self):
+        self.notification_days = []
+        alert_notification = self.update_and_generate_alert_notification()
+
+        # initialize with None
+        self.assertEqual(alert_notification.notification_days, Day.NONE.value)
+
+        # SIMPLE : add one day
+        day = Day.MONDAY
+        alert_notification.add_day_to_notification_days(day)
+        self.assertEqual(alert_notification.notification_days, day.value)
+
+        # SIMPLE : add another day
+        second_day = Day.TUESDAY
+        alert_notification.add_day_to_notification_days(second_day)
+        result_expected = day.value | second_day.value
+        self.assertEqual(alert_notification.notification_days, result_expected)
+
+        # ERROR : Not a Day
+        self.notification_days = [Day.MONDAY]
+        alert_notification = self.update_and_generate_alert_notification()
+
+        wrong_day = "iam no day"
+        error = EnumError(except_enum=Day, wrong_value=wrong_day)
+
+        with patch("logging.error") as mock:
+            alert_notification.add_day_to_notification_days(wrong_day)
+            mock.assert_called_with(error.__str__())
+            self.assertTrue(alert_notification.has_day_in_notification_days(Day.MONDAY))
+
+    def test__remove_day_from_notification_days(self):
+        # SIMPLE
+        self.notification_days = [Day.MONDAY, Day.TUESDAY]
+        alert_notification = self.update_and_generate_alert_notification()
+
+        self.assertTrue(alert_notification.has_day_in_notification_days(Day.MONDAY))
+        self.assertTrue(alert_notification.has_day_in_notification_days(Day.TUESDAY))
+
+        alert_notification.remove_day_from_notification_days(Day.MONDAY)
+
+        self.assertFalse(alert_notification.has_day_in_notification_days(Day.MONDAY))
+        self.assertTrue(alert_notification.has_day_in_notification_days(Day.TUESDAY))
+
+        # ERROR
+        self.notification_days = [Day.MONDAY, Day.TUESDAY]
+        alert_notification = self.update_and_generate_alert_notification()
+
+        not_valid_day = "still not a day"
+        error = EnumError(except_enum=Day, wrong_value=not_valid_day)
+
+        self.assertTrue(alert_notification.has_day_in_notification_days(Day.MONDAY))
+        self.assertTrue(alert_notification.has_day_in_notification_days(Day.TUESDAY))
+
+        with patch("logging.error") as mock:
+            alert_notification.remove_day_from_notification_days(not_valid_day)
+            mock.assert_called_with(error.__str__())
+
+        self.assertTrue(alert_notification.has_day_in_notification_days(Day.MONDAY))
+        self.assertTrue(alert_notification.has_day_in_notification_days(Day.TUESDAY))
+
+    def test__reset_notification_days(self):
+        # - Only One -
+        day = Day.MONDAY
+        # add day that should be removed after reset call
+        self.notification_days = [day]
+        alert_notification = self.update_and_generate_alert_notification()
+        self.assertEqual(alert_notification.notification_days, day.value)
+        self.assertNotEqual(alert_notification.notification_days, Day.NONE.value)
+
+        alert_notification.reset_notification_days()
+
+        self.assertEqual(alert_notification.notification_days, Day.NONE.value)
+
+        # - Many -
+        self.notification_days = [Day.MONDAY, Day.TUESDAY, Day.WEDNESDAY]
+        alert_notification = self.update_and_generate_alert_notification()
+        self.assertNotEqual(alert_notification.notification_days, Day.NONE.value)
+
+        alert_notification.reset_notification_days()
+
+        self.assertEqual(alert_notification.notification_days, Day.NONE.value)
+
+    def test__set_notification_days(self):
+        self.notification_days = []
+        alert_definition = self.update_and_generate_alert_notification()
+
+        # Single Day to add
+        day = Day.MONDAY
+        day_str = [day.name]
+        alert_definition.set_notification_days(day_str)
+        self.assertTrue(bool(alert_definition.notification_days & day.value))
+
+        # Method replace day, not added it to previous
+        day_new = Day.TUESDAY
+        day_new_str = [day_new.name]
+        alert_definition.set_notification_days(day_new_str)
+        self.assertFalse(alert_definition.has_day_in_notification_days(day))
+        self.assertTrue(bool(alert_definition.notification_days & day_new.value))
+
+        # Multiple Day in Once
+        days_list = [Day.MONDAY.name, Day.TUESDAY.name]
+        not_to_have_day = Day.SUNDAY
+        alert_definition.set_notification_days(days_list)
+        self.assertTrue(alert_definition.has_day_in_notification_days(Day.MONDAY))
+        self.assertTrue(alert_definition.has_day_in_notification_days(Day.TUESDAY))
+        self.assertFalse(alert_definition.has_day_in_notification_days(not_to_have_day))
+
+        # ERROR CASE : Day not added
+        not_day = ["im no Day"]
+        alert_definition.set_notification_days(not_day)
+        self.assertEqual(alert_definition.notification_days, Day.NONE.value)
+
+        # ERROR CASE - List of days with second number
+        not_day_list = [Day.MONDAY.name, "im no Day_again"]
+        alert_definition.set_notification_days(not_day_list)
+        self.assertEqual(alert_definition.notification_days, Day.MONDAY.value)
+
+    def test__is_datetime_in_notification_days(self):
+        # Watching Period : SINGLE day
+        self.notification_days = [Day.MONDAY]
+        alert_notification = self.update_and_generate_alert_notification()
+
+        self.assertTrue(alert_notification.is_datetime_in_notification_days(self.monday))
+        self.assertFalse(alert_notification.is_datetime_in_notification_days(self.saturday))
+
+        # Watching Period : MANY days
+        self.notification_days = [Day.MONDAY, Day.TUESDAY]
+        alert_notification = self.update_and_generate_alert_notification()
+
+        tuesday = self.monday + timedelta(days=1)
+
+        self.assertTrue(alert_notification.is_datetime_in_notification_days(self.monday))
+        self.assertTrue(alert_notification.is_datetime_in_notification_days(tuesday))
+        self.assertFalse(alert_notification.is_datetime_in_notification_days(self.saturday))
+
+        # ERROR
+        wrong_days = "iam no datetime"
+
+        with patch("logging.error") as mock:
+            alert_notification.is_datetime_in_notification_days(wrong_days)
+            mock.assert_called()
+
+    # --  HOURS --
+
+    def test__has_hour_in_notification_hours(self):
+        to_have_hour = Hour.H_1
+        not_to_have_hour = Hour.H_2
+
+        self.notification_hours = [to_have_hour]
+        alert_notification = self.update_and_generate_alert_notification()
+
+        self.assertTrue(alert_notification.has_hour_in_notification_hours(to_have_hour))
+        self.assertFalse(alert_notification.has_hour_in_notification_hours(not_to_have_hour))
+
+        # Test in Multiples Flags
+        another_day_to_have = Hour.H_3
+        self.notification_hours = [to_have_hour, another_day_to_have]
+        alert_notification = self.update_and_generate_alert_notification()
+        self.assertTrue(alert_notification.has_hour_in_notification_hours(hour=to_have_hour))
+        self.assertFalse(alert_notification.has_hour_in_notification_hours(hour=not_to_have_hour))
+        self.assertTrue(alert_notification.has_hour_in_notification_hours(hour=another_day_to_have))
+
+        # ERROR : Not a Hour
+        wrong_hour = "iam no hour"
+        error = EnumError(except_enum=Hour, wrong_value=wrong_hour)
+
+        with patch("logging.error") as mock:
+            self.assertFalse(alert_notification.has_hour_in_notification_hours(hour=wrong_hour))
+            mock.assert_called_with(error.__str__())
+
+    def test__add_notification_hour(self):
+        self.notification_hours = []
+        alert_notification = self.update_and_generate_alert_notification()
+
+        # initialize with None
+        self.assertEqual(alert_notification.notification_hours, Hour.NONE.value)
+
+        # SIMPLE : add one hour
+        hour = Hour.H_1
+        alert_notification.add_notification_hour(hour)
+        self.assertEqual(alert_notification.notification_hours, hour.value)
+
+        # SIMPLE : add another hour
+        second_hour = Hour.H_2
+        alert_notification.add_notification_hour(second_hour)
+        result_expected = hour.value | second_hour.value
+        self.assertEqual(alert_notification.notification_hours, result_expected)
+
+        # ERROR : Not a hour - str
+        self.notification_hours = [hour]
+        alert_notification = self.update_and_generate_alert_notification()
+
+        wrong_hour = "iam no hour"
+        error = EnumError(except_enum=Hour, wrong_value=wrong_hour)
+
+        with patch("logging.error") as mock:
+            alert_notification.add_notification_hour(wrong_hour)
+            mock.assert_called_with(error.__str__())
+            self.assertTrue(alert_notification.has_hour_in_notification_hours(hour))
+
+    def test__remove_hour_from_notification_hours(self):
+        # SIMPLE
+        self.notification_hours = [Hour.H_3, Hour.H_1]
+        alert_notification = self.update_and_generate_alert_notification()
+
+        self.assertTrue(alert_notification.has_hour_in_notification_hours(Hour.H_1))
+        self.assertTrue(alert_notification.has_hour_in_notification_hours(Hour.H_3))
+
+        alert_notification.remove_hour_from_notification_hours(Hour.H_3)
+
+        self.assertFalse(alert_notification.has_hour_in_notification_hours(Hour.H_3))
+        self.assertTrue(alert_notification.has_hour_in_notification_hours(Hour.H_1))
+
+        # ERROR
+        self.notification_hours = [Hour.H_3, Hour.H_1]
+        alert_notification = self.update_and_generate_alert_notification()
+
+        not_valid_hour = "still not an hour"
+        error = EnumError(except_enum=Hour, wrong_value=not_valid_hour)
+
+        self.assertTrue(alert_notification.has_hour_in_notification_hours(Hour.H_1))
+        self.assertTrue(alert_notification.has_hour_in_notification_hours(Hour.H_3))
+
+        with patch("logging.error") as mock:
+            alert_notification.remove_hour_from_notification_hours(not_valid_hour)
+            mock.assert_called_with(error.__str__())
+
+        self.assertTrue(alert_notification.has_hour_in_notification_hours(Hour.H_1))
+        self.assertTrue(alert_notification.has_hour_in_notification_hours(Hour.H_3))
+
+    def test__reset_notification_days(self):
+        # - Only One -
+        hour = Hour.H_1
+        # add day that should be removed after reset call
+        self.notification_hours = [hour]
+        alert_notification = self.update_and_generate_alert_notification()
+        self.assertEqual(alert_notification.notification_hours, hour.value)
+        self.assertNotEqual(alert_notification.notification_hours, Hour.NONE.value)
+
+        alert_notification.reset_notification_hours()
+
+        self.assertEqual(alert_notification.notification_hours, Hour.NONE.value)
+
+        # - Many -
+        self.notification_hours = [Hour.H_1, Hour.H_3, Hour.H_5]
+        alert_notification = self.update_and_generate_alert_notification()
+        self.assertNotEqual(alert_notification.notification_hours, Hour.NONE.value)
+
+        alert_notification.reset_notification_hours()
+
+        self.assertEqual(alert_notification.notification_hours, Hour.NONE.value)
+
+    def test__set_notification_days(self):
+        self.notification_hours = []
+        alert_definition = self.update_and_generate_alert_notification()
+
+        # Single Day to add
+        hour: Hour = Hour.H_5
+        alert_definition.set_notification_hours([hour.int_hour])
+        self.assertTrue(bool(alert_definition.notification_hours & hour.value))
+
+        # Method replace day, not added it to previous
+        hour_new = Hour.H_10
+        alert_definition.set_notification_hours([hour_new.int_hour])
+        self.assertFalse(alert_definition.has_hour_in_notification_hours(hour))
+        self.assertTrue(bool(alert_definition.notification_hours & hour_new.value))
+
+
+        # Multiple hours in Once
+        self.notification_hours = []
+        alert_definition = self.update_and_generate_alert_notification()
+
+        hours_list = [Hour.H_0.int_hour, Hour.H_1.int_hour]
+        not_to_have_hour = Hour.H_23
+
+        alert_definition.set_notification_hours(hours_list)
+        self.assertTrue(alert_definition.has_hour_in_notification_hours(Hour.H_0))
+        self.assertTrue(alert_definition.has_hour_in_notification_hours(Hour.H_1))
+        self.assertFalse(alert_definition.has_hour_in_notification_hours(not_to_have_hour))
+
+        # ERROR CASE : hour not added
+        not_hour = ["im no hour"]
+        alert_definition.set_notification_hours(not_hour)
+        self.assertEqual(alert_definition.notification_hours, Hour.NONE.value)
+
+        # ERROR CASE : hour not added
+        not_hour = [54]
+        alert_definition.set_notification_hours(not_hour)
+        self.assertEqual(alert_definition.notification_hours, Hour.NONE.value)
+
+        # ERROR CASE - List of days with second number
+        not_day_list = [Hour.H_1.int_hour, "im no hour_again"]
+        alert_definition.set_notification_hours(not_day_list)
+        self.assertEqual(alert_definition.notification_hours, Hour.H_1.value)
+
+
+    def test__is_datetime_in_notification_hours(self):
+        # Hour : SINGLE Hour
+        self.notification_hours = [Hour.H_1]
+        alert_notification = self.update_and_generate_alert_notification()
+
+        hour_one = datetime(year=2019, month=8, day=26, hour=1, minute=20)
+        hour_two = datetime(year=2019, month=8, day=26, hour=2, minute=20)
+
+        self.assertTrue(alert_notification.is_datetime_in_notification_hours(hour_one))
+        self.assertFalse(alert_notification.is_datetime_in_notification_hours(hour_two))
+
+        # Watching Period : MANY hours
+        self.notification_hours = [Hour.H_1, Hour.H_2]
+        alert_notification = self.update_and_generate_alert_notification()
+
+        hour_zero = hour_one - timedelta(hours=1)
+
+        self.assertTrue(alert_notification.is_datetime_in_notification_hours(hour_one))
+        self.assertTrue(alert_notification.is_datetime_in_notification_hours(hour_two))
+        self.assertFalse(alert_notification.is_datetime_in_notification_hours(hour_zero))
+
+        # ERROR
+        wrong_hour = "iam no datetime"
+
+        with patch("logging.error") as mock:
+            alert_notification.is_datetime_in_notification_hours(wrong_hour)
+            mock.assert_called()
+
+
+    # -- PERIOD --
+    def test___enough_time_between_notifications(self):
         today = datetime(2019, 7, 29)
         yesterday = datetime(2019, 7, 28)
         twenty_days_ago = datetime(2019, 7, 9)
         fourty_days_ago = today - timedelta(days=40)
 
-        # 2 DAY
-        self.number = 2
-        notification = self.update_and_generate_alert_notification()
-        self.assertFalse(notification.is_notification_allowed(yesterday, today))
-        self.assertTrue(notification.is_notification_allowed(twenty_days_ago, today))
 
-        # MONTH
+        # -- 2 DAY --
+
+        self.number = 2
+        self.period = NotificationPeriod.DAY
+        # False
+        self.previous_notification_datetime = yesterday
+        notification = self.update_and_generate_alert_notification()
+        self.assertFalse(notification._enough_time_between_notifications(today))
+
+        # True
+        self.previous_notification_datetime = twenty_days_ago
+        notification = self.update_and_generate_alert_notification()
+        self.assertTrue(notification._enough_time_between_notifications(today))
+
+        # -- 1 MONTH --
+
         self.number = 1
         self.period = NotificationPeriod.MONTH
+
+        # False
+        self.previous_notification_datetime = yesterday
         notification = self.update_and_generate_alert_notification()
-        self.assertFalse(notification.is_notification_allowed(yesterday, today))
-        self.assertFalse(notification.is_notification_allowed(twenty_days_ago, today))
-        self.assertTrue(notification.is_notification_allowed(fourty_days_ago, today))
+        self.assertFalse(notification._enough_time_between_notifications(today))
+        # False
+        self.previous_notification_datetime = twenty_days_ago
+        notification = self.update_and_generate_alert_notification()
+        self.assertFalse(notification._enough_time_between_notifications(today))
+        # True
+        self.previous_notification_datetime = fourty_days_ago
+        notification = self.update_and_generate_alert_notification()
+        self.assertTrue(notification._enough_time_between_notifications(today))
+
+    # -- DATETIME --
+    def test__is_notification_allowed_for_datetime(self):
+        alert_notification = self.update_and_generate_alert_notification()
+        today = datetime(year=2019, month=8, day=26, hour=1, minute=20)
+
+        # DAY = True
+        with patch("model.alert.AlertNotification.is_datetime_in_notification_days", return_value=True) as day_mock:
+            # HOUR = True
+            with patch("model.alert.AlertNotification.is_datetime_in_notification_hours", return_value=True) as hour_mock:
+                self.assertTrue(alert_notification.is_notification_allowed_for_datetime(datetime_to_check=today))
+                day_mock.assert_called_with(datetime_to_check=today)
+                hour_mock.assert_called_with(datetime_to_check=today)
+            # HOUR = False
+            with patch("model.alert.AlertNotification.is_datetime_in_notification_hours", return_value=False) as hour_mock:
+                self.assertFalse(alert_notification.is_notification_allowed_for_datetime(datetime_to_check=today))
+                day_mock.assert_called_with(datetime_to_check=today)
+                hour_mock.assert_called_with(datetime_to_check=today)
+
+        # DAY = False
+        with patch("model.alert.AlertNotification.is_datetime_in_notification_days", return_value=False) as day_mock:
+            # HOUR = True
+            with patch("model.alert.AlertNotification.is_datetime_in_notification_hours", return_value=True) as hour_mock:
+                self.assertFalse(alert_notification.is_notification_allowed_for_datetime(datetime_to_check=today))
+                day_mock.assert_called_with(datetime_to_check=today)
+                hour_mock.assert_not_called()
+            # HOUR = False
+            with patch("model.alert.AlertNotification.is_datetime_in_notification_hours", return_value=False) as hour_mock:
+                self.assertFalse(alert_notification.is_notification_allowed_for_datetime(datetime_to_check=today))
+                day_mock.assert_called_with(datetime_to_check=today)
+                hour_mock.assert_not_called()
+
+    # -- Notification Allowed - GENERAL --
+    def test__is_notification_allowed(self):
+        alert_notification = self.update_and_generate_alert_notification()
+        today = datetime(year=2019, month=8, day=26, hour=1, minute=20)
+
+        # PERIOD = True
+        with patch("model.alert.AlertNotification._enough_time_between_notifications", return_value=True) as period_mock:
+            # DATETIME = True
+            with patch("model.alert.AlertNotification.is_datetime_in_notification_hours", return_value=True) as datetime_mock:
+                self.assertTrue(alert_notification.is_notification_allowed(datetime_to_check=today))
+                period_mock.assert_called_with(datetime_to_check=today)
+                datetime_mock.assert_called_with(datetime_to_check=today)
+            # DATETIME = False
+            with patch("model.alert.AlertNotification.is_datetime_in_notification_hours", return_value=False) as datetime_mock:
+                self.assertFalse(alert_notification.is_notification_allowed(datetime_to_check=today))
+                period_mock.assert_called_with(datetime_to_check=today)
+                datetime_mock.assert_called_with(datetime_to_check=today)
+
+        # PERIOD = False
+        with patch("model.alert.AlertNotification._enough_time_between_notifications", return_value=False) as period_mock:
+            # DATETIME = True
+            with patch("model.alert.AlertNotification.is_datetime_in_notification_hours", return_value=True) as datetime_mock:
+                self.assertFalse(alert_notification.is_notification_allowed(datetime_to_check=today))
+                period_mock.assert_called_with(datetime_to_check=today)
+                datetime_mock.assert_not_called()
+            # DATETIME = False
+            with patch("model.alert.AlertNotification.is_datetime_in_notification_hours", return_value=False) as datetime_mock:
+                self.assertFalse(alert_notification.is_notification_allowed(datetime_to_check=today))
+                period_mock.assert_called_with(datetime_to_check=today)
+                datetime_mock.assert_not_called()
 
 
 class AlertDefinitionTest(unittest.TestCase):
 
-    def setUp(self):
-        self.monday = datetime(2019, 7, 29)  # 29 July 2019 was a MONDAY
-        self.saturday = datetime(2019, 7, 27)  # 27 July 2019 was a SATURDAY
+    def setUp(self) -> None:
+        self.name = "i am the name"
+        self.alert_definition_id = "id"
+        self.description = "i am supposed to describe the Alert definition"
+        self.category = "category"
+        self.level = Level.HIGH
+        self.definition_flags = [
+            AlertDefinitionFlag.INACTIVE
+        ]
+        self.previous_notification = None
+
+    def generate_setup(self):
+        self.setup = {
+            "name": self.name,
+            "id": self.alert_definition_id,
+            "description": self.description,
+            "category": self.category,
+            "level": self.level.name,
+            "flags": [
+                flags.name for flags in self.definition_flags
+            ],
+            "previous_notification": self.previous_notification,
+        }
+
+    def get_alert_definition(self):
+        return AlertDefinition(self.setup)
+
+    def update_setup_and_get_alert_definition(self):
+        self.generate_setup()
+        return self.get_alert_definition()
 
     def test__init(self):
-        alert_definition = AlertDefinition()
+        alert_definition = self.update_setup_and_get_alert_definition()
         self.assertIsInstance(alert_definition, AlertDefinition)
-
-    # WATCHING PERIOD
-    def test__add_day_to_watching_period(self):
-        alert_definition = AlertDefinition()
-
-        # initialize with None
-        self.assertEqual(alert_definition.get_watching_period(), Day.NONE.value)
-
-        # SIMPLE : add one day
-        day = Day.MONDAY
-        alert_definition.add_day_to_watching_period(day)
-        self.assertEqual(alert_definition.get_watching_period(), day.value)
-
-        # SIMPLE : add another day
-        second_day = Day.TUESDAY
-        alert_definition.add_day_to_watching_period(second_day)
-        result_expected = day.value | second_day.value
-        self.assertEqual(alert_definition.get_watching_period(), result_expected)
-
-        # ERROR : Not a Day
-        with self.assertRaises(DayTypeError):
-            alert_definition.add_day_to_watching_period("hello")
-
-    def test__reset_watching_period(self):
-        alert_definition = AlertDefinition()
-
-        # add day that should be removed after reset call
-        day = Day.MONDAY
-        alert_definition.add_day_to_watching_period(day)
-        self.assertEqual(alert_definition.get_watching_period(), day.value)
-
-        alert_definition.reset_watching_period()
-        self.assertEqual(alert_definition.get_watching_period(), Day.NONE.value)
-
-    def test__has_day_in_watching_period(self):
-        alert_definition = AlertDefinition()
-
-        to_have_flag = Day.MONDAY
-        not_to_have_flag = Day.TUESDAY
-
-        alert_definition.add_day_to_watching_period(to_have_flag)
-
-        self.assertTrue(alert_definition.has_day_in_watching_period(to_have_flag))
-        self.assertFalse(alert_definition.has_day_in_watching_period(not_to_have_flag))
-
-        # Test in Multiples Flags
-        alert_definition.add_day_to_watching_period(Day.SATURDAY)
-        self.assertTrue(alert_definition.has_day_in_watching_period(Day.SATURDAY))
-        self.assertFalse(alert_definition.has_day_in_watching_period(not_to_have_flag))
-        self.assertTrue(alert_definition.has_day_in_watching_period(to_have_flag))
-
-    def test__set_watching_period(self):
-        alert_definition = AlertDefinition()
-
-        # Single Day to add
-        day = [Day.MONDAY]
-        alert_definition.set_watching_period(day)
-        self.assertTrue(bool(alert_definition.get_watching_period() & day[0].value))
-
-        # Method replace day, not added it to previous
-        day_new = [Day.TUESDAY]
-        alert_definition.set_watching_period(day_new)
-        self.assertFalse(alert_definition.has_day_in_watching_period(day[0]))
-        self.assertTrue(bool(alert_definition.get_watching_period() & day_new[0].value))
-
-        # Multiple Day in Once
-        days_list = [Day.MONDAY, Day.TUESDAY]
-        not_to_have_day = Day.SUNDAY
-        alert_definition.set_watching_period(days_list)
-        self.assertTrue(alert_definition.has_day_in_watching_period(Day.MONDAY))
-        self.assertTrue(alert_definition.has_day_in_watching_period(Day.TUESDAY))
-
-        # ERROR CASE : Day not added
-        not_day = "im no Day"
-        alert_definition.set_watching_period(not_day)
-        self.assertEqual(alert_definition.get_watching_period(), Day.NONE.value)
-
-        # ERROR CASE - List of days with second number
-        not_day_list = [Day.MONDAY, not_day]
-        alert_definition.set_watching_period(not_day_list)
-        self.assertEqual(alert_definition.get_watching_period(), Day.MONDAY.value)
-
-    def test__is_watching_period(self):
-        alert_definition = AlertDefinition()
-
-        # Flags list is added with FLAG
-        alert_definition.add_day_to_watching_period(Day.MONDAY)
-
-        # Watching Period : SINGLE day
-        self.assertTrue(alert_definition.is_datetime_in_watching_period(self.monday))
-        self.assertFalse(alert_definition.is_datetime_in_watching_period(self.saturday))
-
-        # Watching Period : MANY days
-        alert_definition.add_day_to_watching_period(Day.TUESDAY)
-        tuesday = self.monday + timedelta(days=1)
-        self.assertTrue(alert_definition.is_datetime_in_watching_period(self.monday))
-        self.assertTrue(alert_definition.is_datetime_in_watching_period(tuesday))
-        self.assertFalse(alert_definition.is_datetime_in_watching_period(self.saturday))
-
-        alert_definition.add_day_to_watching_period(Day.SATURDAY)
-        self.assertTrue(alert_definition.is_datetime_in_watching_period(self.saturday))
-
-    # STATUS @deprecated --> replace by a flag in AlertDefinitionFlag class
-    def test__set_status(self):
-        alert_definition = AlertDefinition()
-        alert_definition.set_definition_status(AlertDefinitionStatus.INACTIVE)
-        self.assertTrue(alert_definition.get_definition_status() == AlertDefinitionStatus.INACTIVE)
-        alert_definition.set_definition_status(AlertDefinitionStatus.ACTIVE)
-        self.assertTrue(alert_definition.get_definition_status() == AlertDefinitionStatus.ACTIVE)
 
     # IS ACTIVE
     def test__is_active(self):
-        alert_definition = AlertDefinition()
+        self.definition_flags = [
+            AlertDefinitionFlag.INACTIVE
+        ]
+        alert_definition = self.update_setup_and_get_alert_definition()
         alert_definition.add_definition_flag(AlertDefinitionFlag.INACTIVE)
         self.assertFalse(alert_definition.is_active)
         alert_definition.add_definition_flag(AlertDefinitionStatus.ACTIVE)
         self.assertTrue(alert_definition.is_active)
 
-    # SET INACTIVE
-    def test__set_inactive(self):
-        alert_definition = AlertDefinition()
-        active_flag = AlertDefinitionFlag.ACTIVE
-
-        # SIMPLE
-        alert_definition.set_definition_flag(active_flag)
-        self.assertTrue(alert_definition.has_definition_flag(active_flag))
-        alert_definition.set_inactive()
-        self.assertFalse(alert_definition.has_definition_flag(active_flag))
-
-        # MULTIPLE
-        flag_2 = AlertDefinitionFlag.SAVE_ALL
-        alert_definition.set_definition_flags([active_flag, flag_2])
-
-        self.assertTrue(alert_definition.has_definition_flag(active_flag))
-        self.assertTrue(alert_definition.has_definition_flag(flag_2))
-
-        alert_definition.set_inactive()
-
-        self.assertFalse(alert_definition.has_definition_flag(active_flag))
-        self.assertTrue(alert_definition.has_definition_flag(flag_2))
-
     # LEVEL
-    def test__set_level(self):
-        alert_definition = AlertDefinition()
-        self.assertTrue(alert_definition.get_level() is None)
-        alert_definition.set_level(Level.HIGH)
-        self.assertTrue(alert_definition.get_level() == Level.HIGH)
+    def test__level(self):
+        self.level = Level.LOW
+        alert_definition = self.update_setup_and_get_alert_definition()
+        self.assertTrue(alert_definition.level == Level.LOW)
 
     # DEFINITION FLAG
-    def test__set_definition_flag(self):
-        alert_definition = AlertDefinition()
-        alert_definition.set_definition_flag(AlertDefinitionFlag.SAVE_ALL)
-        self.assertTrue(alert_definition.get_definition_flag() == AlertDefinitionFlag.SAVE_ALL.value)
-
     def test__remove_definition_flag(self):
-        alert_definition = AlertDefinition()
+        alert_definition = self.update_setup_and_get_alert_definition()
         flag = AlertDefinitionFlag.ACTIVE
 
         # SIMPLE
-        alert_definition.set_definition_flag(flag)
+        alert_definition.set_definition_flags_from_str_flags([flag.name])
         self.assertTrue(alert_definition.has_definition_flag(flag))
         alert_definition.remove_definition_flag(flag)
         self.assertFalse(alert_definition.has_definition_flag(flag))
 
         # MULTIPLE
         flag_2 = AlertDefinitionFlag.SAVE_ALL
-        alert_definition.set_definition_flags([flag, flag_2])
+        alert_definition.set_definition_flags_from_str_flags([flag.name, flag_2.name])
 
         self.assertTrue(alert_definition.has_definition_flag(flag))
         self.assertTrue(alert_definition.has_definition_flag(flag_2))
@@ -254,17 +594,17 @@ class AlertDefinitionTest(unittest.TestCase):
         self.assertTrue(alert_definition.has_definition_flag(flag_2))
 
     def test__has_definition_flag(self):
-        alert_definition = AlertDefinition()
+        alert_definition = self.update_setup_and_get_alert_definition()
         self.assertFalse(alert_definition.has_definition_flag(AlertDefinitionFlag.SAVE_ALL))
-        alert_definition.set_definition_flag(AlertDefinitionFlag.SAVE_ALL)
+        alert_definition.set_definition_flags_from_str_flags([AlertDefinitionFlag.SAVE_ALL.name])
         self.assertTrue(alert_definition.has_definition_flag(AlertDefinitionFlag.SAVE_ALL))
 
-    def test__set_definition_flags(self):
-        alert_definition = AlertDefinition()
-        flags = [AlertDefinitionFlag.SAVE_ALL, AlertDefinitionFlag.ANOTHER_FLAG]
-        alert_definition.set_definition_flags(flags)
-        self.assertTrue(bool(alert_definition.get_definition_flag() & AlertDefinitionFlag.SAVE_ALL.value))
-        self.assertTrue(bool(alert_definition.get_definition_flag() & AlertDefinitionFlag.ANOTHER_FLAG.value))
+    def test__set_definition_flags_from_str_flags(self):
+        alert_definition = self.update_setup_and_get_alert_definition()
+        flags = [AlertDefinitionFlag.SAVE_ALL.name, AlertDefinitionFlag.ANOTHER_FLAG.name]
+        alert_definition.set_definition_flags_from_str_flags(flags)
+        self.assertTrue(bool(alert_definition.definition_flag & AlertDefinitionFlag.SAVE_ALL.value))
+        self.assertTrue(bool(alert_definition.definition_flag & AlertDefinitionFlag.ANOTHER_FLAG.value))
 
 
 class MyOperatorTest(unittest.TestCase):
@@ -273,8 +613,9 @@ class MyOperatorTest(unittest.TestCase):
         self.arr = [3, 5, 10, 25, 36, 174]
 
     def test__max(self):
+        import pdb;pdb.set_trace()
         my_str = "MAX"
-        elem = MyOperator(my_str)
+        elem = MyOperator[my_str]
 
         self.assertIsInstance(elem, MyOperator)
         result_expected = max(self.arr)
@@ -311,41 +652,42 @@ class MyOperatorTest(unittest.TestCase):
         with self.assertRaises(TypeError):
             elem.calculate(2)
 
-    class MyOperatorTest(unittest.TestCase):
 
-        def setUp(self):
-            self.data = 5
-            self.value = 10
+class MyOperatorTest(unittest.TestCase):
 
-        def test__sup(self):
-            my_str = "SUP"
-            elem = MyComparator(my_str)
-            self.assertIsInstance(elem, MyComparator)
+    def setUp(self):
+        self.data = 5
+        self.value = 10
 
-            result_expected = self.data > self.value
-            result = elem.compare(self.data, self.value)
+    def test__sup(self):
+        my_str = "SUP"
+        elem = MyComparator(my_str)
+        self.assertIsInstance(elem, MyComparator)
 
-            self.assertEqual(result_expected, result)
+        result_expected = self.data > self.value
+        result = elem.compare(self.data, self.value)
 
-        def test__sup(self):
-            my_str = "INF"
-            elem = MyComparator(my_str)
-            self.assertIsInstance(elem, MyComparator)
+        self.assertEqual(result_expected, result)
 
-            result_expected = self.data < self.value
-            result = elem.compare(self.data, self.value)
+    def test__inf(self):
+        my_str = "INF"
+        elem = MyComparator(my_str)
+        self.assertIsInstance(elem, MyComparator)
 
-            self.assertEqual(result_expected, result)
+        result_expected = self.data < self.value
+        result = elem.compare(self.data, self.value)
 
-        def test__sup(self):
-            my_str = "EQUAL"
-            elem = MyComparator(my_str)
-            self.assertIsInstance(elem, MyComparator)
+        self.assertEqual(result_expected, result)
 
-            result_expected = self.data == self.value
-            result = elem.compare(self.data, self.value)
+    def test__equal(self):
+        my_str = "EQUAL"
+        elem = MyComparator(my_str)
+        self.assertIsInstance(elem, MyComparator)
 
-            self.assertEqual(result_expected, result)
+        result_expected = self.data == self.value
+        result = elem.compare(self.data, self.value)
+
+        self.assertEqual(result_expected, result)
 
 
 class PeriodUnitDefinitionTest(unittest.TestCase):
@@ -588,7 +930,6 @@ class AlertDatatest(unittest.TestCase):
     def setUp(self) -> None:
 
         # data
-        self.data_name = "consommation"
         self.data_period_type = PeriodGeneratorType.USER_BASED
 
         # Period
@@ -602,7 +943,6 @@ class AlertDatatest(unittest.TestCase):
     def generate_setup(self):
         # -- Data --
         self.setup = {
-            "data_name": self.data_name,
             "data_period_type": self.data_period_type.value
         }
 
@@ -624,7 +964,6 @@ class AlertDatatest(unittest.TestCase):
 
         self.assertIsInstance(alert_data, AlertData)
 
-        self.assertEqual(self.data_name, alert_data.data_name)
         self.assertEqual(self.data_period_type, alert_data.data_period_type)
 
     def test__data_period_generator(self):
@@ -749,7 +1088,6 @@ class AlertCalculatorTest(unittest.TestCase):
         self.acceptable_diff = True
 
         # data
-        self.data_name = "consommation"
         self.data_period_type = PeriodGeneratorType.USER_BASED
 
         # value
@@ -774,7 +1112,6 @@ class AlertCalculatorTest(unittest.TestCase):
     def generate_setup(self):
         # -- Data --
         self.data_setup = {
-            "data_name": self.data_name,
             "data_period_type": self.data_period_type.value
         }
 
@@ -848,16 +1185,7 @@ class AlertCalculatorTest(unittest.TestCase):
 
         # -- ERROR -- TODO
 
-    def test__is_alert__get_data(self):
-        todo = True  #TODO
-        # -- PERIOD BASED --
-        #
-        # alert_calculator = self.get_alert_calculator()
-        #
-        # # Pertinent parameters
-        # with patch("model.alert.AlertCalculator.__get_data", return_value=2) as mock:
-        #     alert_calculator.is_alert_situation()
-        #     mock.assert_called()
+
 
 
 
