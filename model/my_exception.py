@@ -1,8 +1,6 @@
-import logging as log
 from enum import Enum
-
-import model.alert
 from model.utility import enum_str_values
+
 
 class EnumError(Exception):
 
@@ -30,3 +28,23 @@ class EnumError(Exception):
     @property
     def except_enum(self):
         return self.__except_enum
+
+
+class ConfigError(Exception):
+    __message: str
+    __obj: object
+
+    def __init__(self, obj: object, msg: str):
+        self.__message = msg
+        self.__obj = obj
+
+    def __str__(self):
+        return "ConfigError from {} : {}".format(self.obj.__class__.__name__, self.message)
+
+    @property
+    def message(self):
+        return self.__message
+
+    @property
+    def obj(self):
+        return self.__obj

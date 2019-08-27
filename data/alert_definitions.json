@@ -2,18 +2,19 @@
 {
   "name": "alertDefinition3",
   "id": "id_3",
-  "id_sensors" : [
+  "sensor_ids" : [
     "id_sensor_1", "id_sensor_2"
   ],
+  "category_id": "category_1",
   "description" : "i am supposed to describe the Alert definition",
   "level" : "LOW",
   "flags": [
     "ACTIVE"
   ],
-  "previous_notification_datetime": null,
+  "last_check": "2019-08-27T08:42:07.962728",
   "calculator": {
     "data": {
-      "data_name": "consommation",
+      "data_period_type" : "USER_BASED",
       "data_period": {
         "quantity": 2,
         "unit": "WEEK"
@@ -21,7 +22,7 @@
     },
     "value": {
       "value_type": "PERIOD_BASED_VALUE",
-      "reference_value": 15,
+      "value_number": 15,
       "value_period": {
         "quantity": 2,
         "unit": "WEEK"
@@ -41,8 +42,8 @@
     ],
     "notification_hours" : [
       8, 9, 10, 11, 12
-    ]
-
+    ],
+    "previous_notification_datetime": "2019-08-27T08:42:07.962728"
   }
 }
 ]

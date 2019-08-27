@@ -8,7 +8,7 @@ from model.alert import AlertDefinition, AlertDefinitionFlag, Level, MyOperator,
     PeriodDefinition, AlertCalculator, LastCheckBasedPeriodGenerator, PeriodGenerator, Period, UserBasedPeriodGenerator, \
     UserBasedValueGenerator, ValueGenerator, PeriodBasedValueGenerator, DataBaseValueGenerator, PeriodGeneratorType, \
     ValueGeneratorType, NoPeriodBasedValueGenerator, SimpleDBBasedValueGenerator, AlertData, AlertValue, \
-    AlertNotification, NotificationPeriod, Day, Hour
+    AlertNotification, NotificationPeriod, Day, Hour, AlertManager
 
 from model.alert import AlertDefinitionStatus
 from model.my_exception import EnumError
@@ -17,6 +17,7 @@ from model.my_exception import EnumError
 class NotificationTest(unittest.TestCase):
 
     setup: dict
+    previous_notification_datetime: datetime
 
     def setUp(self) -> None:
 
@@ -41,7 +42,7 @@ class NotificationTest(unittest.TestCase):
             "email": self.email,
             "notification_days": [day.name for day in self.notification_days],
             "notification_hours": [hour.int_hour for hour in self.notification_hours],
-            "previous_notification_datetime": self.previous_notification_datetime
+            "previous_notification_datetime": self.previous_notification_datetime.isoformat() if self.previous_notification_datetime else None
         }
 
     def update_and_generate_alert_notification(self) -> AlertNotification:
@@ -59,6 +60,23 @@ class NotificationTest(unittest.TestCase):
         self.assertEqual(notification.email, self.email)
         self.assertIsInstance(notification.period, NotificationPeriod)
         self.assertEqual(notification.period, self.period)
+
+
+    def test__previous_datetime(self):
+        # today
+        dt = datetime.today()
+        self.previous_notification_datetime = dt
+
+        notification = self.update_and_generate_alert_notification()
+        self.assertEqual(dt, notification.previous_notification_datetime)
+
+        # None
+        dt = None
+        self.previous_notification_datetime = dt
+
+        notification = self.update_and_generate_alert_notification()
+        self.assertEqual(dt, notification.previous_notification_datetime)
+
 
     # --  DAY --
 
@@ -383,7 +401,6 @@ class NotificationTest(unittest.TestCase):
         alert_definition.set_notification_hours(not_day_list)
         self.assertEqual(alert_definition.notification_hours, Hour.H_1.value)
 
-
     def test__is_datetime_in_notification_hours(self):
         # Hour : SINGLE Hour
         self.notification_hours = [Hour.H_1]
@@ -519,6 +536,8 @@ class NotificationTest(unittest.TestCase):
 class AlertDefinitionTest(unittest.TestCase):
 
     def setUp(self) -> None:
+        self.today = datetime.today()
+
         self.name = "i am the name"
         self.alert_definition_id = "id"
         self.description = "i am supposed to describe the Alert definition"
@@ -528,37 +547,58 @@ class AlertDefinitionTest(unittest.TestCase):
             AlertDefinitionFlag.INACTIVE
         ]
         self.previous_notification = None
+        self.sensor_ids = ["sensor_id_1"]
+        self.last_check = self.today - timedelta(days=2)
+
+
 
     def generate_setup(self):
         self.setup = {
             "name": self.name,
             "id": self.alert_definition_id,
             "description": self.description,
-            "category": self.category,
+            "category_id": self.category,
             "level": self.level.name,
+            "sensor_ids": self.sensor_ids,
+            "last_check": self.last_check.isoformat(),
             "flags": [
                 flags.name for flags in self.definition_flags
             ],
-            "previous_notification": self.previous_notification,
+            "notification": {},
+            "calculator": {}
         }
 
     def get_alert_definition(self):
-        return AlertDefinition(self.setup)
+        return AlertDefinition(self.setup, self.today)
 
     def update_setup_and_get_alert_definition(self):
         self.generate_setup()
         return self.get_alert_definition()
 
     def test__init(self):
-        alert_definition = self.update_setup_and_get_alert_definition()
-        self.assertIsInstance(alert_definition, AlertDefinition)
+        self.definition_flags = [AlertDefinitionFlag.ACTIVE]
+        with patch("model.alert.AlertCalculator") as calculator_mock:
+            with patch("model.alert.AlertNotification") as notification_mock:
+                with patch("model.alert.AlertDefinition.set_definition_flags_from_str_flags") as flag_mock:
+                    alert_definition = self.update_setup_and_get_alert_definition()
+                    self.assertEqual(self.name, alert_definition.name)
+                    self.assertEqual(self.alert_definition_id, alert_definition.id)
+                    self.assertEqual(self.category, alert_definition.category_id)
+                    self.assertEqual(self.description, alert_definition.description)
+                    self.assertEqual(self.sensor_ids, alert_definition.sensor_ids)
+                    calculator_mock.assert_called_with(setup=self.setup["calculator"], today=self.today, last_check=self.last_check)
+                    notification_mock.assert_called_with(setup=self.setup["notification"])
+                    flag_mock.assert_called_with(flags_list=self.setup["flags"])
+
 
     # IS ACTIVE
     def test__is_active(self):
         self.definition_flags = [
             AlertDefinitionFlag.INACTIVE
         ]
-        alert_definition = self.update_setup_and_get_alert_definition()
+        with patch("model.alert.AlertCalculator"):
+            with patch("model.alert.AlertNotification"):
+                alert_definition = self.update_setup_and_get_alert_definition()
         alert_definition.add_definition_flag(AlertDefinitionFlag.INACTIVE)
         self.assertFalse(alert_definition.is_active)
         alert_definition.add_definition_flag(AlertDefinitionStatus.ACTIVE)
@@ -567,12 +607,17 @@ class AlertDefinitionTest(unittest.TestCase):
     # LEVEL
     def test__level(self):
         self.level = Level.LOW
-        alert_definition = self.update_setup_and_get_alert_definition()
+        with patch("model.alert.AlertCalculator"):
+            with patch("model.alert.AlertNotification"):
+                alert_definition = self.update_setup_and_get_alert_definition()
         self.assertTrue(alert_definition.level == Level.LOW)
 
     # DEFINITION FLAG
     def test__remove_definition_flag(self):
-        alert_definition = self.update_setup_and_get_alert_definition()
+        with patch("model.alert.AlertCalculator"):
+            with patch("model.alert.AlertNotification"):
+                alert_definition = self.update_setup_and_get_alert_definition()
+
         flag = AlertDefinitionFlag.ACTIVE
 
         # SIMPLE
@@ -594,13 +639,17 @@ class AlertDefinitionTest(unittest.TestCase):
         self.assertTrue(alert_definition.has_definition_flag(flag_2))
 
     def test__has_definition_flag(self):
-        alert_definition = self.update_setup_and_get_alert_definition()
-        self.assertFalse(alert_definition.has_definition_flag(AlertDefinitionFlag.SAVE_ALL))
-        alert_definition.set_definition_flags_from_str_flags([AlertDefinitionFlag.SAVE_ALL.name])
-        self.assertTrue(alert_definition.has_definition_flag(AlertDefinitionFlag.SAVE_ALL))
+        with patch("model.alert.AlertCalculator"):
+            with patch("model.alert.AlertNotification"):
+                alert_definition = self.update_setup_and_get_alert_definition()
+                self.assertFalse(alert_definition.has_definition_flag(AlertDefinitionFlag.SAVE_ALL))
+                alert_definition.set_definition_flags_from_str_flags([AlertDefinitionFlag.SAVE_ALL.name])
+                self.assertTrue(alert_definition.has_definition_flag(AlertDefinitionFlag.SAVE_ALL))
 
     def test__set_definition_flags_from_str_flags(self):
-        alert_definition = self.update_setup_and_get_alert_definition()
+        with patch("model.alert.AlertCalculator"):
+            with patch("model.alert.AlertNotification"):
+                alert_definition = self.update_setup_and_get_alert_definition()
         flags = [AlertDefinitionFlag.SAVE_ALL.name, AlertDefinitionFlag.ANOTHER_FLAG.name]
         alert_definition.set_definition_flags_from_str_flags(flags)
         self.assertTrue(bool(alert_definition.definition_flag & AlertDefinitionFlag.SAVE_ALL.value))
@@ -1186,6 +1235,13 @@ class AlertCalculatorTest(unittest.TestCase):
         # -- ERROR -- TODO
 
 
+class AlertManager(unittest.TestCase):
+
+    alert_manager: AlertManager
+
+    def test__init(self):
+        self.alert_manager = AlertManager()
+        self.assertEqual(1, len(self.alert_manager.alert_definition_list))
 
 
 

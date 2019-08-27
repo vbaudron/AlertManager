@@ -12,9 +12,9 @@ from datetime import datetime, timedelta
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
-from model.my_exception import EnumError
-from model.tokill.my_decorator import controller_types
-from model.utility import get_day_name_from_datetime, get_dict_from_json_file, get_str_from_file, \
+from model import utility
+from model.my_exception import EnumError, ConfigError
+from model.utility import get_day_name_from_datetime, get_data_from_json_file, get_str_from_file, \
     get_source_path, get_data_path
 from enum import Enum, auto, unique, Flag, IntEnum
 
@@ -341,7 +341,7 @@ class AlertValue:
 
     @property
     def value(self):
-        return self.__value
+        return self.value_generator.value
 
     @property
     def setup(self):
@@ -434,14 +434,20 @@ class AlertCalculator:
         self.__alert_data = AlertData(setup=setup["data"], last_check=last_check, today=today)
         self.__alert_value = AlertValue(setup=setup["value"], today=today)
 
+    def check_non_coherent_config(self):
+        if self.acceptable_diff and self.alert_value.value_generator_type is ValueGeneratorType.USER_BASED_VALUE:
+            raise ConfigError(self, "acceptable_diff and ValueGeneratorType.USER_BASED_VALUE not compatible")
+
     # -- Find Value that will be Compare with Data --
     def __get_value(self):
         if self.acceptable_diff:
-            self.__value = self.comparator.get_new_value(value=self.alert_value.value,
-                                                         percent=self.alert_value.value_number)
-        return self.value_generator.value
+            return self.comparator.get_new_value(
+                value=self.alert_value.value,
+                percent=self.alert_value.value_number
+            )
+        return self.alert_value.value
 
-    def is_alert_situation(self):
+    def is_alert_situation(self) -> bool:
         self.__data = self.__operator.calculate(self.alert_data.get_all_data_in_db())
         self.__value = self.__get_value()
         return self.comparator.compare(self.data, self.value)
@@ -451,6 +457,14 @@ class AlertCalculator:
     @property
     def setup(self):
         return self.__setup
+
+    @property
+    def data(self):
+        return self.__data
+
+    @property
+    def value(self):
+        return self.__value
 
     @property
     def operator(self):
@@ -564,13 +578,15 @@ class AlertNotification:
         self.__email = setup["email"]
         self.set_notification_days(setup["notification_days"])
         self.set_notification_hours(setup["notification_hours"])
-        self.__previous_notification_datetime = setup["previous_notification_datetime"]
+        self.__previous_notification_datetime = utility.getDateTimeFromISO8601String(setup["previous_notification_datetime"])
+
+    # -- IS Notification ALLOWED --
 
     def is_notification_allowed(self, datetime_to_check: datetime):
         return self._enough_time_between_notifications(datetime_to_check=datetime_to_check) \
                and self.is_notification_allowed_for_datetime(datetime_to_check=datetime_to_check)
 
-    #  [IS_ALLOWED] PERIOD
+    # PERIOD
     def _enough_time_between_notifications(self, datetime_to_check: datetime):
         """
                check if we are allowed to send a new notification
@@ -589,14 +605,13 @@ class AlertNotification:
 
         return count >= self.number
 
-    #  [IS_ALLOWED] DATETIME
+    # DATETIME
     def is_notification_allowed_for_datetime(self, datetime_to_check: datetime):
         return self.is_datetime_in_notification_days(
             datetime_to_check=datetime_to_check
         ) and self.is_datetime_in_notification_hours(
             datetime_to_check=datetime_to_check)
 
-    # Datetime --> Days
     def is_datetime_in_notification_days(self, datetime_to_check: datetime) -> bool:
         """
         check if notifications are allowed for the day of this datetime
@@ -612,7 +627,6 @@ class AlertNotification:
         except AttributeError as error:
             log.error(error)
 
-    # Datetime --> Hours
     def is_datetime_in_notification_hours(self, datetime_to_check: datetime):
         try:
             int_hour = datetime_to_check.hour
@@ -621,23 +635,7 @@ class AlertNotification:
         except AttributeError as error:
             log.error(error)
 
-    # -- Notification DAYS --
-    def add_day_to_notification_days(self, day: Day) -> None:
-        try:
-            self.__notification_days |= day.value
-        except AttributeError:
-            error = EnumError(except_enum=Day, wrong_value=day)
-            log.error(error.__str__())
-
-    def remove_day_from_notification_days(self, day: Day) -> None:
-        try:
-            self.__notification_days ^= day.value
-        except AttributeError:
-            error = EnumError(except_enum=Day, wrong_value=day)
-            log.error(error.__str__())
-
-    def reset_notification_days(self) -> None:
-        self.__notification_days = Day.NONE.value
+    # -- SET DATA FROM JSON --
 
     def set_notification_days(self, days_list: array) -> None:
         """
@@ -657,18 +655,6 @@ class AlertNotification:
             error = EnumError(except_enum=Day, wrong_value=day)
             log.error(error.__str__())
 
-    def has_day_in_notification_days(self, day: Day) -> bool:
-        try:
-            return bool(day.value & self.notification_days)
-        except AttributeError:
-            error = EnumError(except_enum=Day, wrong_value=day)
-            log.error(error.__str__())
-            return False
-
-    # -- Notification HOURS --
-    def reset_notification_hours(self):
-        self.__notification_hours = Hour.NONE.value
-
     def set_notification_hours(self, list_hours: array):
         self.reset_notification_hours()
         try:
@@ -679,6 +665,39 @@ class AlertNotification:
         except KeyError:
             error = EnumError(except_enum=Hour, wrong_value=int_hour)
             log.error(error.__str__())
+
+    # -- UTILS --
+    # days
+
+    def add_day_to_notification_days(self, day: Day) -> None:
+        try:
+            self.__notification_days |= day.value
+        except AttributeError:
+            error = EnumError(except_enum=Day, wrong_value=day)
+            log.error(error.__str__())
+
+    def remove_day_from_notification_days(self, day: Day) -> None:
+        try:
+            self.__notification_days ^= day.value
+        except AttributeError:
+            error = EnumError(except_enum=Day, wrong_value=day)
+            log.error(error.__str__())
+
+    def reset_notification_days(self) -> None:
+        self.__notification_days = Day.NONE.value
+
+    def has_day_in_notification_days(self, day: Day) -> bool:
+        try:
+            return bool(day.value & self.notification_days)
+        except AttributeError:
+            error = EnumError(except_enum=Day, wrong_value=day)
+            log.error(error.__str__())
+            return False
+
+    # Hours
+
+    def reset_notification_hours(self):
+        self.__notification_hours = Hour.NONE.value
 
     def add_notification_hour(self, hour: Hour):
         try:
@@ -744,7 +763,7 @@ class Email:
         pass
 
     def prepare(self, filename: str):
-        self.__config = get_dict_from_json_file(self.email_config_path(filename))
+        self.__config = get_data_from_json_file(self.email_config_path(filename))
         self.__subject = self.config["subject"]
         self.__sender_email = self.config["sender_email"]
         self.__email_content = get_str_from_file(self.get_file_path_name())
@@ -858,16 +877,29 @@ class AlertDefinition:
     - an ALERT CREATION - date, invalid data ...
     """
 
+    __name: str
+    __id: str
+    __description: str
+    __category_id: str
+    __sensor_ids: array
+    __level: Level
+    __alert_definition_flag: int
+    __last_check: datetime
     __calculator: AlertCalculator
     __notification: AlertNotification
 
-    def __init__(self, setup: dict):
-        self.name = setup["name"]
-        self.description = setup["description"]
-        self.category = setup["category"]
+    def __init__(self, setup: dict, today: datetime = datetime.today()):
+        self.__name = setup["name"]
+        self.__id = setup["id"]
+        self.__description = setup["description"]
+        self.__category_id = setup["category_id"]
         self.__level = Level[setup["level"]]
-        self.set_definition_flags_from_str_flags(setup["flags"])
-        self.__previous_ = setup["previous_notification"]
+        self.__sensor_ids = setup["sensor_ids"]
+        self.set_definition_flags_from_str_flags(flags_list=setup["flags"])
+        self.__last_check = utility.getDateTimeFromISO8601String(setup["last_check"])
+        self.__notification = AlertNotification(setup=setup["notification"])
+        self.__calculator = AlertCalculator(setup=setup["calculator"], today=today, last_check=self.last_check)
+
 
     @property
     def is_active(self) -> bool:
@@ -886,10 +918,6 @@ class AlertDefinition:
             # TODO CREATE ALERT
             if self.notification.is_notification_allowed(datetime_to_check=today):
                 pass  # TODO NOTIFY
-
-    @property
-    def level(self):
-        return self.__level
 
     # DEFINITION FLAG
     def has_definition_flag(self, flag: AlertDefinitionFlag):
@@ -915,6 +943,10 @@ class AlertDefinition:
         return self.__alert_definition_flag
 
     @property
+    def name(self):
+        return self.__name
+
+    @property
     def calculator(self):
         return self.__calculator
 
@@ -922,4 +954,74 @@ class AlertDefinition:
     def notification(self):
         return self.__notification
 
+    @property
+    def level(self):
+        return self.__level
+
+    @property
+    def category_id(self):
+        return self.__category_id
+
+    @property
+    def id(self):
+        return self.__id
+
+    @property
+    def description(self):
+        return self.__description
+
+    @property
+    def sensor_ids(self):
+        return self.__sensor_ids
+
+    @property
+    def last_check(self):
+        return self.__last_check
+
 # ---------------------------------------------------------------------------------------------------------------------
+
+
+class AlertManager:
+
+    FILENAME = "alert_definitions.json"
+
+    __alert_definition_list: list
+    __today: datetime
+
+    def __init__(self):
+        self.__today = datetime.today()
+        data = get_data_from_json_file(os.path.join(get_data_path(), AlertManager.FILENAME))
+        self.__alert_definition_list = list()
+
+        for setup in data:
+            try:
+                alert_definition = AlertDefinition(setup=setup, today=self.today)
+                self.__alert_definition_list.append(alert_definition)
+            except (KeyError, ConfigError) as error:
+                log.error(error.__str__())
+
+    def start(self):
+        for alert_definition in self.alert_definition_list:
+            if alert_definition.is_active:
+                alert_definition.check(today=self.today)
+
+    def save(self):
+        pass  # TODO
+
+    @staticmethod
+    def start_manager():
+        alert_manager = AlertManager()
+        alert_manager.start()
+        alert_manager.save()
+
+    @property
+    def alert_definition_list(self):
+        return self.__alert_definition_list
+
+    @property
+    def today(self):
+        return self.__today
+
+
+if __name__ == '__main__':
+    AlertManager.start_manager()
