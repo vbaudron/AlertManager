@@ -145,11 +145,11 @@ it will request in the database the list of value for a certain period.
 ## Init
  ```python 
 "data": {
-      "period_generator_type" : "LAST_CHECK",
+      "data_period_type" : "LAST_CHECK",
       "data_period": {} # Existence depends on period_generator_type
     }
 ```
-### Period Generator
+### Period Generator Type
 Has a `data_period_generator: PeriodGenerator` attribute that will generate the pertinent period
 ```python
 class PeriodGeneratorType(Enum):
@@ -157,9 +157,63 @@ class PeriodGeneratorType(Enum):
     USER_BASED = auto()  # this will give the period asked by the User --> in json
 ```
 
-### Data Period
-Exists only if `period_generator_type is PeriodGenerator.USER_BASED`
+### Data Period Generator
+Exists only IF
+```python
+period_generator_type is PeriodGenerator.USER_BASED
+```
+
+```python
 "data_period": {
         "quantity": 2,
         "unit": "WEEK"
       }
+```
+Will generate the pertinent period to get value in database.
+
+# Period Unit
+
+```pyhton
+class PeriodUnitDefinition(Enum):
+    """
+       Represents units of period available
+       value : represent the String associated to the period - it is the KEY in json file
+       go_past : it is the method associated to calculate the start date from the end_date
+   """
+    DAY = "DAY", go_past_with_days
+    WEEK = "WEEK", go_past_with_weeks
+    MONTH = "MONTH", go_past_with_months
+    YEAR = "YEAR", go_past_with_years
+```
+
+# Alert Value
+This represents how we get the Value that will be compare to Data
+
+## Init
+```
+"value": {
+      "value_type": "PERIOD_BASED_VALUE",
+      "value_number": 15,
+      "value_period": {} # Existence depends on value_type
+    }
+ ```
+    
+ ### Value Generator Type
+```
+ @unique
+class ValueGeneratorType(Enum):
+    USER_BASED_VALUE = auto()        # No Period Required - Value will be value_number
+    SIMPLE_DB_BASED_VALUE = auto()   # No Period Required - Value will be found in database 
+    PERIOD_BASED_VALUE = auto()      # Period Required --> value_period
+ ```
+ 
+ ### Value Number
+ It is the basic value. 
+ - In some case it is the value itself 
+ case : ValueGeneratorType.USER_BASED_VALUE
+ - It can also be a pourcentage to apply to value
+ case : acceptable_diff and value_type is SIMPLE_DB_BASED_VALUE
+ 
+WARNING :  USER_BASED_VALUE and acceptable_diff are non coherent raise a ConfigError
+ 
+ 
