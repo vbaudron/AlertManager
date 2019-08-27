@@ -1,28 +1,49 @@
 # AlertManager
+__Provide a static method to start the script__
+```python
+@staticmethod
+    def start_manager():
+        alert_manager = AlertManager()
+        alert_manager.start()
+        alert_manager.save()
+```
+Alert manager will create `AlertDefinition` Objects based on the json array from *alert_definitions.json* file.
+For each AlerDefinition it will check if we are in alert situation, and then save back the object updated
 
-Alert manager will create ```AlertDefinition``` Objects based the json list from *alert_definitions.json* file.
-For each AlerDefinition it will check if we are in alert situation
+`FILENAME = "alert_definitions.json"`
 
-## AlertDefinition
+## Init
+Fill its `alert_definition_list` attribute with `AlertDefinition` instances based on the JsonFile
 
-### Init
-Based on json a python ```dict```
-```json
-  {
-    "name": "alertDefinition3",
+## Start
+Execute check method of each `AlertDefinition` object
+
+## Save
+save the current `AlertDefinition` object to the *alert_definitions.json* file. 
+
+
+
+# AlertDefinition
+
+## Init
+Based on json to python `dict`
+```python
+setup = 
+{
+  "name": "alertDefinition3",
   "id": "id_3",
+  "sensor_ids" : [],
   "description" : "i am supposed to describe the Alert definition",
   "level" : "LOW",
-  "flags": [
-    "ACTIVE"
-  ],
-  "previous_notification": null,
-    "calculator": {},
-    "notification": {}
-  }
+  "category_id": "category_1",
+  "last_check": "2019-08-27T08:42:07.962728",
+  "flags": [],
+  "notification": {},     # AlertNotification
+  "calculator": {}        # AlertCalculator
+}
 ```
 
-#### Level
+### Level
 ```python
 @unique
 class Level(Enum):
@@ -30,7 +51,7 @@ class Level(Enum):
     HIGH = auto()
 ```
 
-#### Flag
+### Flag
 ```python
 @unique
 class AlertDefinitionFlag(Flag):
@@ -38,12 +59,107 @@ class AlertDefinitionFlag(Flag):
     ACTIVE = auto()        # Replace status
 ```
 
-### Check if Alert situation
+### Last Check
+It represent the last time the Alert Definition has been checked
+will be fill by the Alert manager, the front does not care
+it is a `string` based on the ISO8601 `datetime`
+
+
+## Check method
 ```python
 def check(today: datetime) -> None:
         if self.calculator.is_alert_situation():
-            # TODO CREATE ALERT
+            # CREATE ALERT
             if self.notification.is_notification_allowed(datetime_to_check=today):
-                # TODO NOTIFY
+                # NOTIFY
 ```
 
+# AlertCalculator
+It will be use to see if we are in an alert situation.
+
+## Init
+
+```python 
+def __init__(self, setup: dict, last_check: datetime, today: datetime):
+  
+```
+
+based on dict from `setup["calculator"]`
+
+```python
+  {
+    "data": {},         # AlertData
+    "value": {},        # AlertValue
+    "comparator": "SUP",
+    "operator": "MAX",
+    "acceptable_diff" : True
+    }
+```
+
+### Data
+Represent the data to check in database.
+This is how to calculate data we want to compare
+It will be an `AlertData` object
+
+### Value
+Represent the value to compare with.
+Data will be compare to Value thanks to a Comparator.
+
+### Operator
+Operator is the way the array of data will be handle
+```python
+class MyOperator(Enum):  # Simplified for explanation
+    MAX = find_max
+    MIN = find_min
+    AVERAGE = calculate_average
+ ```
+ 
+ ### Comparator
+ Comparator is the way Data will be compare to Value
+```python
+class MyComparator(Enum):  # Simplified for explanation
+    SUP = is_sup, new_sup_value
+    INF = is_inf, new_inf_value
+    EQUAL = equal, new_equal_value
+ ```
+ 
+ ### Acceptable_diff
+ This is a `bool`.
+ if Acceptable_diff:
+    the value to compare with will be be replace by a pourcentage of this value (manage by Comparator with `new_xxx_value` functions). `True` means this is a "*seuil*" alert definition
+ 
+ ## Is Alert Situation method
+ ```python 
+ def is_alert_situation(self) -> bool:
+    self.__data = self.__operator.calculate(self.alert_data.get_all_data_in_db())
+    self.__value = self.__get_value()
+    return self.comparator.compare(self.data, self.value)
+ ```
+ is the method called to calculate if we are in alert situation. 
+Return result of the comparaison between Data and Value
+
+# AlertData
+this will generate the data that we have to compare.
+it will request in the database the list of value for a certain period.
+
+## Init
+ ```python 
+"data": {
+      "period_generator_type" : "LAST_CHECK",
+      "data_period": {} # Existence depends on period_generator_type
+    }
+```
+### Period Generator
+Has a `data_period_generator: PeriodGenerator` attribute that will generate the pertinent period
+```python
+class PeriodGeneratorType(Enum):
+    LAST_CHECK = auto()  # this will give the period since the last AlertManager check
+    USER_BASED = auto()  # this will give the period asked by the User --> in json
+```
+
+### Data Period
+Exists only if `period_generator_type is PeriodGenerator.USER_BASED`
+"data_period": {
+        "quantity": 2,
+        "unit": "WEEK"
+      }
