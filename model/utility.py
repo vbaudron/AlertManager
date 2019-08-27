@@ -6,12 +6,20 @@ from enum import Enum
 import logging as log
 from typing import Any, Union
 
+import dateutil.parser
 import mysql.connector
 
 import datetime
 
 DATA_FOLDER_NAME = "data"
 SOURCE_FOLDER_NAME = "source"
+
+
+def getDateTimeFromISO8601String(s: str) -> datetime:
+    d = None
+    if s:
+        d = dateutil.parser.parse(s)
+    return d
 
 
 class MyEnum(Enum):
@@ -37,12 +45,11 @@ def get_day_name_from_datetime(my_datetime: datetime) -> "day Name":
         log.error(error.__str__())
 
 
-
-def get_dict_from_json_file(file_path_name):
+def get_data_from_json_file(file_path_name):
     print(file_path_name)
     with open(file_path_name, 'r') as f:
-        my_dict = json.load(f)
-    return my_dict
+        my_data = json.load(f)
+    return my_data
 
 
 def get_str_from_file(file_path_name):
@@ -54,12 +61,16 @@ def get_str_from_file(file_path_name):
 def get_file_last_modification_time(file_path_name: str) -> datetime:
     return os.path.getmtime(file_path_name)
 
+def get_parent_dir():
+    return os.path.abspath(os.path.join(os.getcwd(), os.pardir))
+
+
 def get_source_path():
     return os.path.join(os.getcwd(), SOURCE_FOLDER_NAME)
 
 
 def get_data_path():
-    return os.path.join(os.getcwd(), DATA_FOLDER_NAME)
+    return os.path.join(get_parent_dir(), DATA_FOLDER_NAME)
 
 
 class MySqlConnection():
@@ -83,7 +94,7 @@ class MySqlConnection():
             self.__update_connection_info()
 
     def __update_connection_info(self):
-        setup = get_dict_from_json_file(self.FILENAME)
+        setup = get_data_from_json_file(self.FILENAME)
         self.__host = setup["host"]
         self.__username = setup["username"]
         self.__password = setup["password"],
