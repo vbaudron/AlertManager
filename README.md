@@ -32,7 +32,7 @@ setup =
 {
   "name": "alertDefinition3",
   "id": "id_3",
-  "sensor_ids" : [],
+  "meter_ids" : [],
   "description" : "i am supposed to describe the Alert definition",
   "level" : "LOW",
   "category_id": "category_1",
