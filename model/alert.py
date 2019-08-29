@@ -15,7 +15,8 @@ from email.mime.text import MIMEText
 from model import utility
 from model.my_exception import EnumError, ConfigError
 from model.utility import get_day_name_from_datetime, get_data_from_json_file, get_str_from_file, \
-    get_source_path, get_data_path
+    get_path_in_data_folder_of, my_sql, ALERT_TABLE_NAME, ALERT_TABLE_COMPO, \
+    SOURCE_PATH
 from enum import Enum, auto, unique, Flag, IntEnum
 
 
@@ -295,7 +296,7 @@ class NoPeriodBasedValueGenerator(ValueGenerator):
         self._value = value
 
 
-# ------------------ [ AlertValue Class ] ---------------------
+# ------------------  [ AlertValue Class ] ---------------------
 
 class AlertValue:
     # setup
@@ -348,7 +349,7 @@ class AlertValue:
         return self.__setup
 
 
-# ------------------ [ AlertData Class ] ---------------------
+# ------------------  [ AlertData Class ]  ---------------------
 
 
 class AlertData:
@@ -375,13 +376,12 @@ class AlertData:
             self.__data_period_generator = UserBasedPeriodGenerator(user_data=self.setup["data_period"],
                                                                     today=today)
 
-    def get_all_data_in_db(self) -> "list: all data from db":
+    def get_all_data_in_db(self, meter_id: str) -> "list: all data from db":
         period = self.__data_period_generator.get_pertinent_period()
         start_date = period.get_start_date()
         all_data = [30, 45, 60]  # TODO : Link To DB
         return all_data
 
-    # property
     @property
     def data_period_type(self):
         return self.__data_period_type
@@ -399,7 +399,7 @@ class AlertData:
         return self.__setup
 
 
-# ------------------ [ FACTORY Class ] ---------------------
+# ------------------   [ FACTORY Class ]   ---------------------
 
 class AlertCalculator:
     __setup: dict
@@ -447,8 +447,8 @@ class AlertCalculator:
             )
         return self.alert_value.value
 
-    def is_alert_situation(self) -> bool:
-        self.__data = self.__operator.calculate(self.alert_data.get_all_data_in_db())
+    def is_alert_situation(self, meter_id: str) -> bool:
+        self.__data = self.__operator.calculate(self.alert_data.get_all_data_in_db(meter_id=meter_id))
         self.__value = self.__get_value()
         return self.comparator.compare(self.data, self.value)
 
@@ -578,7 +578,7 @@ class AlertNotification:
         self.__email = setup["email"]
         self.set_notification_days(setup["notification_days"])
         self.set_notification_hours(setup["notification_hours"])
-        self.__previous_notification_datetime = utility.getDateTimeFromISO8601String(setup["previous_notification_datetime"])
+        self.__previous_notification_datetime = utility.get_datetime_from_iso_str(setup["previous_notification_datetime"])
 
     # -- IS Notification ALLOWED --
 
@@ -625,7 +625,7 @@ class AlertNotification:
             result = self.has_day_in_notification_days(Day[day.upper()])
             return result
         except AttributeError as error:
-            log.error(error)
+            log.warning(error)
 
     def is_datetime_in_notification_hours(self, datetime_to_check: datetime):
         try:
@@ -633,7 +633,7 @@ class AlertNotification:
             hour = Hour.get_from_int(number=int_hour)
             return self.has_hour_in_notification_hours(hour=hour)
         except AttributeError as error:
-            log.error(error)
+            log.warning(error)
 
     # -- SET DATA FROM JSON --
 
@@ -653,7 +653,7 @@ class AlertNotification:
                     self.add_day_to_notification_days(enum_day)
         except KeyError:
             error = EnumError(except_enum=Day, wrong_value=day)
-            log.error(error.__str__())
+            log.warning(error.__str__())
 
     def set_notification_hours(self, list_hours: array):
         self.reset_notification_hours()
@@ -664,7 +664,7 @@ class AlertNotification:
                     self.add_notification_hour(hour)
         except KeyError:
             error = EnumError(except_enum=Hour, wrong_value=int_hour)
-            log.error(error.__str__())
+            log.warning(error.__str__())
 
     # -- UTILS --
     # days
@@ -674,14 +674,14 @@ class AlertNotification:
             self.__notification_days |= day.value
         except AttributeError:
             error = EnumError(except_enum=Day, wrong_value=day)
-            log.error(error.__str__())
+            log.warning(error.__str__())
 
     def remove_day_from_notification_days(self, day: Day) -> None:
         try:
             self.__notification_days ^= day.value
         except AttributeError:
             error = EnumError(except_enum=Day, wrong_value=day)
-            log.error(error.__str__())
+            log.warning(error.__str__())
 
     def reset_notification_days(self) -> None:
         self.__notification_days = Day.NONE.value
@@ -691,7 +691,7 @@ class AlertNotification:
             return bool(day.value & self.notification_days)
         except AttributeError:
             error = EnumError(except_enum=Day, wrong_value=day)
-            log.error(error.__str__())
+            log.warning(error.__str__())
             return False
 
     # Hours
@@ -704,14 +704,14 @@ class AlertNotification:
             self.__notification_hours |= hour.value
         except AttributeError:
             error = EnumError(except_enum=Hour, wrong_value=hour)
-            log.error(error.__str__())
+            log.warning(error.__str__())
 
     def has_hour_in_notification_hours(self, hour: Hour) -> bool:
         try:
             return bool(hour.value & self.notification_hours)
         except AttributeError:
             error = EnumError(except_enum=Hour, wrong_value=hour)
-            log.error(error.__str__())
+            log.warning(error.__str__())
             return False
 
     def remove_hour_from_notification_hours(self, hour: Hour) -> None:
@@ -719,7 +719,7 @@ class AlertNotification:
             self.__notification_hours ^= hour.value
         except AttributeError:
             error = EnumError(except_enum=Hour, wrong_value=hour)
-            log.error(error.__str__())
+            log.warning(error.__str__())
 
     @property
     def number(self):
@@ -788,12 +788,12 @@ class Email:
             server.send_message(from_addr=self.sender_email, to_addrs=self.receiver_email, msg=html.as_string())
 
     def email_config_path(self, filename: str):
-        config_path = os.path.join(get_data_path(), filename)
+        config_path = get_path_in_data_folder_of(filename)
         print("config_path", config_path)
         return config_path
 
     def get_template_path(self):
-        template_path = os.path.join(get_source_path(), self.TEMPLATE_FOLDER_NAME)
+        template_path = os.path.join(SOURCE_PATH, self.TEMPLATE_FOLDER_NAME)
         print("template_path", template_path)
         return template_path
 
@@ -829,15 +829,57 @@ class Email:
 
 # -----------------------------------------------------   ALERT  -------------------------------------------------------
 
-class Alert:
-    __id: str
-    __date: datetime
-    __alert_calculator: AlertCalculator
+class AlertStatus(Enum):
+    CURRENT = 1
+    ARCHIVE = 0
 
-    def __init__(self, alert_calculator: AlertCalculator, today: datetime) -> None:
-        self.__alert_calculator = alert_calculator
-        self.__date = today
-        # TODO generate ID
+
+class Alert:
+    __id: int
+    __datetime: datetime
+    __alert_definition_description: str
+    __value: float
+    __data: float
+    __status: AlertStatus
+    __meter_id: int
+
+    def __init__(self, alert_definition_description: str, value: float, data: float, today: datetime, meter_id: int) -> None:
+        self.__value = value
+        self.__data = data
+        self.__datetime = today
+        self.__meter_id = meter_id
+        self.__status = AlertStatus.CURRENT
+        self.__alert_definition_description = alert_definition_description
+
+    def save(self):
+        query = self.query_construction()
+        data = self.generate_data()
+        my_sql.execute_and_close(query=query, params=data)
+
+    def generate_data(self):
+        data = [
+            self.__datetime,
+            self.__alert_definition_description,
+            self.__data,
+            self.__value,
+            self.__status.value,
+            self.__meter_id
+         ]
+        return data
+
+    def query_construction(self):
+        # PARAMS
+        params_list = list(key for key, value in ALERT_TABLE_COMPO.items())
+        params_list.pop(0)
+        params_str = ", ".join([param for param in params_list])
+
+        # Format
+        format_param = ", ".join(["%s" for param in params_list])
+
+        # QUERY
+        query = "INSERT INTO {} ({}) VALUES ({})".format(ALERT_TABLE_NAME, params_str, format_param)
+        print(query)
+        return query
 
 
 # -----------------------------------------------   ALERT DEFINITION   -------------------------------------------------
@@ -878,10 +920,10 @@ class AlertDefinition:
     """
 
     __name: str
-    __id: str
+    __id: int
     __description: str
     __category_id: str
-    __sensor_ids: array
+    __meter_ids: array
     __level: Level
     __alert_definition_flag: int
     __last_check: datetime
@@ -894,9 +936,9 @@ class AlertDefinition:
         self.__description = setup["description"]
         self.__category_id = setup["category_id"]
         self.__level = Level[setup["level"]]
-        self.__sensor_ids = setup["sensor_ids"]
+        self.__meter_ids = setup["meter_ids"]
         self.set_definition_flags_from_str_flags(flags_list=setup["flags"])
-        self.__last_check = utility.getDateTimeFromISO8601String(setup["last_check"])
+        self.__last_check = utility.get_datetime_from_iso_str(setup["last_check"])
         self.__notification = AlertNotification(setup=setup["notification"])
         self.__calculator = AlertCalculator(setup=setup["calculator"], today=today, last_check=self.last_check)
 
@@ -908,16 +950,24 @@ class AlertDefinition:
     # CHECK
     def check(self, today: datetime):
         """
-        Check if we are in alert situation according to this Alert Definition
+        Check if we are in alert situation for each meter ids according to this Alert Definition
 
         :param today the date you want to check
         :type today datetime
 
         """
-        if self.calculator.is_alert_situation():
-            # TODO CREATE ALERT
-            if self.notification.is_notification_allowed(datetime_to_check=today):
-                pass  # TODO NOTIFY
+        for meter_id in self.meter_ids:
+            if self.calculator.is_alert_situation(meter_id=meter_id):
+                alert = Alert(
+                    alert_definition_description=self.description,
+                    value=self.calculator.value,
+                    data=self.calculator.data,
+                    today=today,
+                    meter_id=meter_id
+                )
+                alert.save()
+                if self.notification.is_notification_allowed(datetime_to_check=today):
+                    pass  # TODO NOTIFY
 
     # DEFINITION FLAG
     def has_definition_flag(self, flag: AlertDefinitionFlag):
@@ -971,8 +1021,8 @@ class AlertDefinition:
         return self.__description
 
     @property
-    def sensor_ids(self):
-        return self.__sensor_ids
+    def meter_ids(self):
+        return self.__meter_ids
 
     @property
     def last_check(self):
@@ -990,7 +1040,7 @@ class AlertManager:
 
     def __init__(self):
         self.__today = datetime.today()
-        data = get_data_from_json_file(os.path.join(get_data_path(), AlertManager.FILENAME))
+        data = get_data_from_json_file(get_path_in_data_folder_of(AlertManager.FILENAME))
         self.__alert_definition_list = list()
 
         for setup in data:
@@ -998,7 +1048,7 @@ class AlertManager:
                 alert_definition = AlertDefinition(setup=setup, today=self.today)
                 self.__alert_definition_list.append(alert_definition)
             except (KeyError, ConfigError) as error:
-                log.error(error.__str__())
+                log.warning(error.__str__())
 
     def start(self):
         for alert_definition in self.alert_definition_list:

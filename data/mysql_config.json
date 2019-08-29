@@ -1,6 +1,6 @@
 {
   "host": "localhost",
-  "username": "yourusername",
-  "password": "yourpassword",
-  "database": "my_db"
+  "username": "test_username",
+  "password": "test_password",
+  "database": "jci_test"
 }

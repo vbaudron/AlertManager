@@ -102,7 +102,7 @@ class NotificationTest(unittest.TestCase):
         wrong_day = "iam no day"
         error = EnumError(except_enum=Day, wrong_value=wrong_day)
 
-        with patch("logging.error") as mock:
+        with patch("logging.warning") as mock:
             self.assertFalse(alert_notification.has_day_in_notification_days(day=wrong_day))
             mock.assert_called_with(error.__str__())
 
@@ -131,7 +131,7 @@ class NotificationTest(unittest.TestCase):
         wrong_day = "iam no day"
         error = EnumError(except_enum=Day, wrong_value=wrong_day)
 
-        with patch("logging.error") as mock:
+        with patch("logging.warning") as mock:
             alert_notification.add_day_to_notification_days(wrong_day)
             mock.assert_called_with(error.__str__())
             self.assertTrue(alert_notification.has_day_in_notification_days(Day.MONDAY))
@@ -159,7 +159,7 @@ class NotificationTest(unittest.TestCase):
         self.assertTrue(alert_notification.has_day_in_notification_days(Day.MONDAY))
         self.assertTrue(alert_notification.has_day_in_notification_days(Day.TUESDAY))
 
-        with patch("logging.error") as mock:
+        with patch("logging.warning") as mock:
             alert_notification.remove_day_from_notification_days(not_valid_day)
             mock.assert_called_with(error.__str__())
 
@@ -244,7 +244,7 @@ class NotificationTest(unittest.TestCase):
         # ERROR
         wrong_days = "iam no datetime"
 
-        with patch("logging.error") as mock:
+        with patch("logging.warning") as mock:
             alert_notification.is_datetime_in_notification_days(wrong_days)
             mock.assert_called()
 
@@ -272,7 +272,7 @@ class NotificationTest(unittest.TestCase):
         wrong_hour = "iam no hour"
         error = EnumError(except_enum=Hour, wrong_value=wrong_hour)
 
-        with patch("logging.error") as mock:
+        with patch("logging.warning") as mock:
             self.assertFalse(alert_notification.has_hour_in_notification_hours(hour=wrong_hour))
             mock.assert_called_with(error.__str__())
 
@@ -301,7 +301,7 @@ class NotificationTest(unittest.TestCase):
         wrong_hour = "iam no hour"
         error = EnumError(except_enum=Hour, wrong_value=wrong_hour)
 
-        with patch("logging.error") as mock:
+        with patch("logging.warning") as mock:
             alert_notification.add_notification_hour(wrong_hour)
             mock.assert_called_with(error.__str__())
             self.assertTrue(alert_notification.has_hour_in_notification_hours(hour))
@@ -329,7 +329,7 @@ class NotificationTest(unittest.TestCase):
         self.assertTrue(alert_notification.has_hour_in_notification_hours(Hour.H_1))
         self.assertTrue(alert_notification.has_hour_in_notification_hours(Hour.H_3))
 
-        with patch("logging.error") as mock:
+        with patch("logging.warning") as mock:
             alert_notification.remove_hour_from_notification_hours(not_valid_hour)
             mock.assert_called_with(error.__str__())
 
@@ -425,7 +425,7 @@ class NotificationTest(unittest.TestCase):
         # ERROR
         wrong_hour = "iam no datetime"
 
-        with patch("logging.error") as mock:
+        with patch("logging.warning") as mock:
             alert_notification.is_datetime_in_notification_hours(wrong_hour)
             mock.assert_called()
 
@@ -547,9 +547,8 @@ class AlertDefinitionTest(unittest.TestCase):
             AlertDefinitionFlag.INACTIVE
         ]
         self.previous_notification = None
-        self.sensor_ids = ["sensor_id_1"]
+        self.meter_ids = [1]
         self.last_check = self.today - timedelta(days=2)
-
 
 
     def generate_setup(self):
@@ -559,7 +558,7 @@ class AlertDefinitionTest(unittest.TestCase):
             "description": self.description,
             "category_id": self.category,
             "level": self.level.name,
-            "sensor_ids": self.sensor_ids,
+            "meter_ids": self.meter_ids,
             "last_check": self.last_check.isoformat(),
             "flags": [
                 flags.name for flags in self.definition_flags
@@ -585,7 +584,7 @@ class AlertDefinitionTest(unittest.TestCase):
                     self.assertEqual(self.alert_definition_id, alert_definition.id)
                     self.assertEqual(self.category, alert_definition.category_id)
                     self.assertEqual(self.description, alert_definition.description)
-                    self.assertEqual(self.sensor_ids, alert_definition.sensor_ids)
+                    self.assertEqual(self.meter_ids, alert_definition.meter_ids)
                     calculator_mock.assert_called_with(setup=self.setup["calculator"], today=self.today, last_check=self.last_check)
                     notification_mock.assert_called_with(setup=self.setup["notification"])
                     flag_mock.assert_called_with(flags_list=self.setup["flags"])
@@ -662,7 +661,6 @@ class MyOperatorTest(unittest.TestCase):
         self.arr = [3, 5, 10, 25, 36, 174]
 
     def test__max(self):
-        import pdb;pdb.set_trace()
         my_str = "MAX"
         elem = MyOperator[my_str]
 
