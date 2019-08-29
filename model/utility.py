@@ -8,34 +8,42 @@ from typing import Any, Union
 
 import dateutil.parser
 import mysql.connector
+from mysql.connector import errorcode, MySQLConnection
 
 import datetime
 
+from definition import ROOT_DIR
+
+
+# _______________________________________________ PATH _________________________________________________________________
+
+# Folder Name
 DATA_FOLDER_NAME = "data"
 SOURCE_FOLDER_NAME = "source"
 
+# Path Name
+DATA_PATH = os.path.join(ROOT_DIR, DATA_FOLDER_NAME)
+SOURCE_PATH = os.path.join(ROOT_DIR, SOURCE_FOLDER_NAME)
 
-def getDateTimeFromISO8601String(s: str) -> datetime:
+
+# Function to get full pat DATA
+def get_path_in_data_folder_of(filename: str):
+    return os.path.join(DATA_PATH, filename)
+
+
+# Function to get full path from SOURCE
+def get_path_in_source_folder_of(filename: str):
+    return os.path.join(SOURCE_FOLDER_NAME, filename)
+
+
+# _________________________________________________ DATETIME ___________________________________________________________
+
+
+def get_datetime_from_iso_str(s: str) -> datetime:
     d = None
     if s:
         d = dateutil.parser.parse(s)
     return d
-
-
-class MyEnum(Enum):
-    @staticmethod
-    def str_values(cls):
-        my_str = ""
-        for name, member in cls.__members__.items():
-            my_str += "'{0}' : {1}    ".format(name, member.value)
-        return my_str
-
-
-def enum_str_values(enum: Enum) -> "Str of each member of the enum":
-    my_str = ""
-    for name, member in enum.__members__.items():
-        my_str += "'{0}' : {1}    ".format(name, member.value)
-    return my_str
 
 
 def get_day_name_from_datetime(my_datetime: datetime) -> "day Name":
@@ -52,6 +60,9 @@ def get_data_from_json_file(file_path_name):
     return my_data
 
 
+# ___________________________________________________ FILE ____________________________________________________________
+
+
 def get_str_from_file(file_path_name):
     with open(file_path_name, 'r') as f:
         my_str = f.read()
@@ -61,21 +72,20 @@ def get_str_from_file(file_path_name):
 def get_file_last_modification_time(file_path_name: str) -> datetime:
     return os.path.getmtime(file_path_name)
 
-def get_parent_dir():
-    return os.path.abspath(os.path.join(os.getcwd(), os.pardir))
+
+def enum_str_values(enum: Enum) -> "Str of each member of the enum":
+    my_str = ""
+    for name, member in enum.__members__.items():
+        my_str += "'{0}' : {1}    ".format(name, member.value)
+    return my_str
 
 
-def get_source_path():
-    return os.path.join(os.getcwd(), SOURCE_FOLDER_NAME)
+# __________________________________________________ MY SQL ____________________________________________________________
 
 
-def get_data_path():
-    return os.path.join(get_parent_dir(), DATA_FOLDER_NAME)
+class MySqlConnection:
 
-
-class MySqlConnection():
-
-    FILENAME = "../data/mysql_config.json"  # TODO
+    FILENAME = "mysql_config.json"
 
     __host: str
     __username: str
@@ -84,28 +94,58 @@ class MySqlConnection():
 
     __open_time: datetime
 
+    __connection: MySQLConnection
+
     def __init__(self) -> None:
         super().__init__()
         self.__open_time = datetime.datetime.today()
         self.__update_connection_info()
+        self.__connection = None
 
-    def get_or_update_file(self):
-        if self.open_time < get_file_last_modification_time(self.FILENAME):
+    def get_file_path(self):
+        return get_path_in_data_folder_of(MySqlConnection.FILENAME)
+
+    def update_file_if_needed(self) -> bool:
+        if self.open_time.timestamp() < get_file_last_modification_time(self.get_file_path()):
             self.__update_connection_info()
+            return True
+        return False
 
     def __update_connection_info(self):
-        setup = get_data_from_json_file(self.FILENAME)
+        setup = get_data_from_json_file(self.get_file_path())
         self.__host = setup["host"]
         self.__username = setup["username"]
-        self.__password = setup["password"],
+        self.__password = setup["password"]
         self.__database = setup["database"]
 
     def connect(self):
-        return mysql.connector.connect(
+        self.__connection = MySQLConnection(
             host=self.host,
             user=self.username,
-            passwd=self.password
+            password=self.password,
+            db=self.database
         )
+        log.debug("connected")
+        print("connected")
+
+    def generate_cursor(self):
+        if self.update_file_if_needed() or not self.__connection or not self.__connection.is_connected():
+            self.connect()
+        return self.__connection.cursor()
+
+    def execute_and_close(self, query: str, params=None):
+        my_cursor = self.generate_cursor()
+        my_cursor.execute(operation=query, params=params)
+        my_sql.commit()
+        my_cursor.close()
+        my_sql.close()
+
+    def commit(self):
+        my_sql.__connection.commit()
+
+    def close(self):
+        self.__connection.cursor().close()
+        self.__connection.close()
 
     @property
     def open_time(self):
@@ -128,9 +168,30 @@ class MySqlConnection():
         return self.__database
 
 
-# TODO mysql_conn = MySqlConnection().connect()
+# -------------------------- #   MySQL Connection   # -------------------------- #
 
-if __name__ == '__main__':
-    for i in range(0, 7):
-        print(calendar.day_name[i])
+my_sql = MySqlConnection()
+
+# -------------------------- #     Alert Table      # -------------------------- #
+
+ALERT_TABLE_NAME = "alerts"
+METER_TABLE_NAME = "BI_COMPTEURS"
+
+CREATE_ALERT_TABLE = "CREATE TABLE IF NOT EXISTS {}".format(ALERT_TABLE_NAME)
+ALERT_TABLE_COMPO = {
+    "alert_id": "INT AUTO_INCREMENT PRIMARY KEY",
+    "datetime": "DATETIME NOT NULL",
+    "alert_definition_description": "VARCHAR(255) NOT NULL",
+    "data": "DOUBLE",
+    "value": "DOUBLE",
+    "status": "TINYINT",
+    "meter_id": "INT NOT NULL"
+}
+
+FOREIGN_KEY = "FOREIGN KEY (meter_id) REFERENCES {}(id)".format(METER_TABLE_NAME)
+
+# -------------------------- #     Compteurs Table      # -------------------------- #
+
+
+# ______________________________________________________________________________________________________________________
 
