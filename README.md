@@ -59,6 +59,9 @@ class AlertDefinitionFlag(Flag):
     ACTIVE = auto()        # Replace status
 ```
 
+### Meter Id
+This is the list of the meter id (the primary key from the table *BI_COMPTEURS*) concerned by the alertDefinition.
+
 ### Last Check
 It represent the last time the Alert Definition has been checked
 will be fill by the Alert manager, the front does not care
@@ -216,4 +219,54 @@ class ValueGeneratorType(Enum):
  
 WARNING :  USER_BASED_VALUE and acceptable_diff are non coherent raise a ConfigError
  
- 
+ # An EXAMPLE
+ ```json
+ [
+{
+  "name": "alertDefinition3",
+  "id": "id_3",
+  "meter_ids" : [
+    1, 2
+  ],
+  "category_id": "category_1",
+  "description" : "i am supposed to describe the Alert definition",
+  "level" : "LOW",
+  "flags": [
+    "ACTIVE"
+  ],
+  "last_check": "2019-08-27T08:42:07.962728",
+  "calculator": {
+    "data": {
+      "data_period_type" : "USER_BASED",
+      "data_period": {
+        "quantity": 2,
+        "unit": "WEEK"
+      }
+    },
+    "value": {
+      "value_type": "PERIOD_BASED_VALUE",
+      "value_number": 15,
+      "value_period": {
+        "quantity": 2,
+        "unit": "WEEK"
+      }
+    },
+    "comparator": "SUP",
+    "operator": "MAX",
+    "acceptable_diff" : true
+  },
+  "notification": {
+    "period": "DAY",
+    "number": 2,
+    "email": "virginie.baudron@gmail.com",
+    "notification_days" : [
+      "MONDAY",
+      "TUESDAY"
+    ],
+    "notification_hours" : [
+      8, 9, 10, 11, 12
+    ],
+    "previous_notification_datetime": "2019-08-27T08:42:07.962728"
+  }
+}
+]```
