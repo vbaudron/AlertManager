@@ -1,3 +1,9 @@
+# Script to create SQL tables needed
+
+[see script](https://github.com/SOFTEE-AHU/AlertManager/blob/master/scripts/alert_tables_creation.py)
+
+[see tables details](https://github.com/SOFTEE-AHU/AlertManager/blob/master/model/utils.py#L270)
+
 # AlertManager
 __Provide a static method to start the script__
 ```python
@@ -49,6 +55,15 @@ setup =
 class Level(Enum):
     LOW = 0
     HIGH = auto()
+```
+
+### Status
+```python
+# STATUS
+@unique
+class AlertDefinitionStatus(Enum):
+    INACTIVE = 0
+    ACTIVE = 1
 ```
 
 ### Flag
@@ -231,8 +246,9 @@ WARNING :  USER_BASED_VALUE and acceptable_diff are non coherent raise a ConfigE
   "category_id": "category_1",
   "description" : "i am supposed to describe the Alert definition",
   "level" : "LOW",
+  "status" : "ACTIVE",
   "flags": [
-    "ACTIVE"
+    "SAVE_ALL"
   ],
   "last_check": "2019-08-27T08:42:07.962728",
   "calculator": {
