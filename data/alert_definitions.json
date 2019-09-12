@@ -10,7 +10,7 @@
   "level" : "LOW",
   "status" : "ACTIVE",
   "flags": [
-    "ACTIVE"
+    "SAVE_ALL"
   ],
   "last_check": "2019-08-27T08:42:07.962728",
   "calculator": {

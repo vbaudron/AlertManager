@@ -544,7 +544,7 @@ class AlertDefinitionTest(unittest.TestCase):
         self.category = "category"
         self.level = Level.HIGH
         self.definition_flags = [
-            AlertDefinitionFlag.INACTIVE
+            AlertDefinitionFlag.NONE
         ]
         self.previous_notification = None
         self.meter_ids = [1]
@@ -575,7 +575,7 @@ class AlertDefinitionTest(unittest.TestCase):
         return self.get_alert_definition()
 
     def test__init(self):
-        self.definition_flags = [AlertDefinitionFlag.ACTIVE]
+        self.definition_flags = [AlertDefinitionFlag.SAVE_ALL]
         with patch("model.alert.AlertCalculator") as calculator_mock:
             with patch("model.alert.AlertNotification") as notification_mock:
                 with patch("model.alert.AlertDefinition.set_definition_flags_from_str_flags") as flag_mock:
@@ -593,12 +593,12 @@ class AlertDefinitionTest(unittest.TestCase):
     # IS ACTIVE
     def test__is_active(self):
         self.definition_flags = [
-            AlertDefinitionFlag.INACTIVE
+            AlertDefinitionFlag.NONE
         ]
         with patch("model.alert.AlertCalculator"):
             with patch("model.alert.AlertNotification"):
                 alert_definition = self.update_setup_and_get_alert_definition()
-        alert_definition.add_definition_flag(AlertDefinitionFlag.INACTIVE)
+        alert_definition.add_definition_flag(AlertDefinitionFlag.NONE)
         self.assertFalse(alert_definition.is_active)
         alert_definition.add_definition_flag(AlertDefinitionStatus.ACTIVE)
         self.assertTrue(alert_definition.is_active)
@@ -617,7 +617,7 @@ class AlertDefinitionTest(unittest.TestCase):
             with patch("model.alert.AlertNotification"):
                 alert_definition = self.update_setup_and_get_alert_definition()
 
-        flag = AlertDefinitionFlag.ACTIVE
+        flag = AlertDefinitionFlag.SAVE_ALL
 
         # SIMPLE
         alert_definition.set_definition_flags_from_str_flags([flag.name])
