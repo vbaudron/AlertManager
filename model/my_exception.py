@@ -1,5 +1,5 @@
 from enum import Enum
-from model.utility import enum_str_values
+from model.utils import enum_str_values
 
 
 class EnumError(Exception):

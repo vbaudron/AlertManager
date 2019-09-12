@@ -5,7 +5,7 @@ import datetime
 
 import unittest
 
-from model.utility import DateUtils
+from model.utils import DateUtils
 
 
 class DayTest(unittest.TestCase):

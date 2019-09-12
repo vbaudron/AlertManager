@@ -12,11 +12,11 @@ from datetime import datetime, timedelta
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
-from model import utility
+from model import utils
 from model.my_exception import EnumError, ConfigError
-from model.utility import get_day_name_from_datetime, get_data_from_json_file, get_str_from_file, \
+from model.utils import get_day_name_from_datetime, get_data_from_json_file, get_str_from_file, \
     get_path_in_data_folder_of, my_sql, ALERT_TABLE_NAME, ALERT_TABLE_COMPO, \
-    SOURCE_PATH
+    SOURCE_PATH, iter_row, METER_TABLE_NAME
 from enum import Enum, auto, unique, Flag, IntEnum
 
 
@@ -238,6 +238,10 @@ class ValueGeneratorType(Enum):
 class ValueGenerator(ABC):
     _value: float
 
+    @abstractmethod
+    def calculate_value(self, meter_id: int):
+        raise NotImplementedError
+
     @property
     def value(self):
         return self._value
@@ -252,45 +256,50 @@ class UserBasedValueGenerator(ValueGenerator):
 
 class DataBaseValueGenerator(ABC):
 
-    def __init__(self, conn_info: dict) -> None:
+    def __init__(self) -> None:
         super().__init__()
-        self.connect(conn_info)
-
-    def connect(self, conn_info: dict):  # TODO
-        pass
 
     @abstractmethod
-    def get_value_in_db(self):
+    def get_value_in_db(self, meter_id: int):
         raise NotImplementedError
+
+    def calculate_value(self, meter_id: int):
+        self._value = self.get_value_in_db(meter_id=meter_id)
 
 
 class SimpleDBBasedValueGenerator(DataBaseValueGenerator, ValueGenerator):  # GOAL
 
-    def __init__(self, conn_info: dict) -> None:
-        super().__init__(conn_info=conn_info)
-        self.get_value_in_db()
+    def __init__(self) -> None:
+        super().__init__()
 
-    def get_value_in_db(self):
-        pass  # TODO
+    def get_value_in_db(self, meter_id: int):
+        return 0  # TODO
 
 
 class PeriodBasedValueGenerator(DataBaseValueGenerator, ValueGenerator):
-    __period: Period
 
-    def __init__(self, conn_info: dict, user_data: dict, today: datetime) -> None:
-        super().__init__(conn_info=conn_info)
+    __period: Period
+    __operator: MyOperator
+
+    def __init__(self, operator: MyOperator, user_data: dict, today: datetime) -> None:
+        super().__init__()
         self.generate_period(user_data=user_data, today=today)
-        self.get_value_in_db()
+        self.__operator = operator
 
     def generate_period(self, user_data: dict, today: datetime):
         period_generator = UserBasedPeriodGenerator(user_data=user_data, today=today)
         self.__period = period_generator.get_pertinent_period()
 
-    def get_value_in_db(self):
-        self._value = 3  # TODO
+    def get_value_in_db(self, meter_id: int):
+        hdl = HandleDataFromDB(period=self.__period)
+        result = hdl.get_data_from_db(meter_id=meter_id)
+        return self.__operator.calculate(result)
 
 
 class NoPeriodBasedValueGenerator(ValueGenerator):
+    def calculate_value(self, meter_id: int):
+        pass
+
     def __init__(self, value: int) -> None:
         super().__init__()
         self._value = value
@@ -307,26 +316,29 @@ class AlertValue:
     __value_number: int
     __value: float  # value to compare with
 
-    def __init__(self, setup: dict, today: datetime):
+    def __init__(self, setup: dict, today: datetime, operator: MyOperator):
         self.__setup = setup
         self.__value_generator_type = ValueGeneratorType[self.setup["value_type"]]
         self.__value_number = self.setup["value_number"]
 
         # Set Factory
-        self.set_value_generator(today=today)
+        self.set_value_generator(today=today, operator=operator)
 
-    def set_value_generator(self, today: datetime):
+    def set_value_generator(self, today: datetime, operator: MyOperator):
 
         if self.value_generator_type is ValueGeneratorType.USER_BASED_VALUE:
             self.__value_generator = NoPeriodBasedValueGenerator(value=self.value_number)
         elif self.value_generator_type is ValueGeneratorType.PERIOD_BASED_VALUE:
             self.__value_generator = PeriodBasedValueGenerator(
-                conn_info={},
+                operator=operator,
                 user_data=self.setup["value_period"],
                 today=today
             )
         elif self.value_generator_type is ValueGeneratorType.SIMPLE_DB_BASED_VALUE:
-            self.__value_generator = SimpleDBBasedValueGenerator(conn_info={})
+            self.__value_generator = SimpleDBBasedValueGenerator()
+
+    def calculate_value(self, meter_id: int):
+        self.value_generator.calculate_value(meter_id=meter_id)
 
     @property
     def value_number(self):
@@ -376,10 +388,10 @@ class AlertData:
             self.__data_period_generator = UserBasedPeriodGenerator(user_data=self.setup["data_period"],
                                                                     today=today)
 
-    def get_all_data_in_db(self, meter_id: str) -> "list: all data from db":
+    def get_all_data_in_db(self, meter_id: int, is_index: bool) -> "list: all data from db":
         period = self.__data_period_generator.get_pertinent_period()
-        start_date = period.get_start_date()
-        all_data = [30, 45, 60]  # TODO : Link To DB
+        all_data = HandleDataFromDB(period=period).get_data_from_db(meter_id=meter_id, is_index=is_index)
+        print("all data ", all_data)
         return all_data
 
     @property
@@ -399,7 +411,67 @@ class AlertData:
         return self.__setup
 
 
+# -----------------------------------------------    HANDLE DONNESCOMPTAGE  -------------------------------------------------
+
+
+class HandleDataFromDB:
+    table_name = "BI_DONNESCOMPTAGE"
+    value_column_name = "VALEUR"
+    meter_id_column_name = "R_COMPTEUR"
+    hour_column_name = "DATE_HEURE"
+
+    __period: Period
+
+    def __init__(self, period: Period):
+        self.__period = period
+
+    @staticmethod
+    def generate_query() -> str:
+        query = "SELECT {} FROM {} WHERE {} = %s AND {} BETWEEN %s AND %s".format(
+            HandleDataFromDB.value_column_name,
+            HandleDataFromDB.table_name,
+            HandleDataFromDB.meter_id_column_name,
+            HandleDataFromDB.hour_column_name
+        )
+        print(query)
+        return query
+
+    def __get_query_result(self, meter_id: int):
+        my_cursor = my_sql.generate_cursor()
+        my_cursor.execute(
+            operation=HandleDataFromDB.generate_query(),
+            params=(
+                meter_id,
+                self.__period.get_start_date(),
+                self.__period.get_end_date()
+            )
+        )
+
+        result = list()
+        for row in iter_row(my_cursor, 10):
+            result.append(row[0])
+
+        my_sql.close()
+
+        return result
+
+    def __aggregate_result(self, result):
+        agg = list()
+        i = 1
+        while i < len(result):
+            agg.append(result[i] - result[i - 1])
+            i += 1
+        return agg
+
+    def get_data_from_db(self, meter_id: int, is_index: bool):
+        result = self.__get_query_result(meter_id=meter_id)
+        if is_index:
+            result = self.__aggregate_result(result=result)
+        return result
+
+
 # ------------------   [ FACTORY Class ]   ---------------------
+
 
 class AlertCalculator:
     __setup: dict
@@ -432,14 +504,15 @@ class AlertCalculator:
         self.__comparator = MyComparator(setup["comparator"])
 
         self.__alert_data = AlertData(setup=setup["data"], last_check=last_check, today=today)
-        self.__alert_value = AlertValue(setup=setup["value"], today=today)
+        self.__alert_value = AlertValue(setup=setup["value"], today=today, operator=self.operator)
 
     def check_non_coherent_config(self):
         if self.acceptable_diff and self.alert_value.value_generator_type is ValueGeneratorType.USER_BASED_VALUE:
             raise ConfigError(self, "acceptable_diff and ValueGeneratorType.USER_BASED_VALUE not compatible")
 
     # -- Find Value that will be Compare with Data --
-    def __get_value(self):
+    def __get_value(self, meter_id: int):
+        self.__alert_value.calculate_value(meter_id=meter_id)
         if self.acceptable_diff:
             return self.comparator.get_new_value(
                 value=self.alert_value.value,
@@ -447,9 +520,9 @@ class AlertCalculator:
             )
         return self.alert_value.value
 
-    def is_alert_situation(self, meter_id: str) -> bool:
-        self.__data = self.__operator.calculate(self.alert_data.get_all_data_in_db(meter_id=meter_id))
-        self.__value = self.__get_value()
+    def is_alert_situation(self, meter_id: int, is_index: bool) -> bool:
+        self.__data = self.__operator.calculate(self.alert_data.get_all_data_in_db(meter_id=meter_id, is_index=is_index))
+        self.__value = self.__get_value(meter_id=meter_id)
         return self.comparator.compare(self.data, self.value)
 
     # --- PROPERTIES ---
@@ -578,7 +651,7 @@ class AlertNotification:
         self.__email = setup["email"]
         self.set_notification_days(setup["notification_days"])
         self.set_notification_hours(setup["notification_hours"])
-        self.__previous_notification_datetime = utility.get_datetime_from_iso_str(setup["previous_notification_datetime"])
+        self.__previous_notification_datetime = utils.get_datetime_from_iso_str(setup["previous_notification_datetime"])
 
     # -- IS Notification ALLOWED --
 
@@ -900,6 +973,11 @@ class AlertDefinitionFlag(Flag):
     SAVE_ALL = auto()  # Always calculate Alert even if notification not allowed & if alert exist, save it
     ANOTHER_FLAG = auto()  # Flag to Test - Do not forget to Refactor when change it
 
+# STATUS
+@unique
+class AlertDefinitionStatus(Enum):
+    INACTIVE = 0
+    ACTIVE = 1
 
 # LEVEL
 @unique
@@ -925,7 +1003,8 @@ class AlertDefinition:
     __category_id: str
     __meter_ids: array
     __level: Level
-    __alert_definition_flag: int
+    __flag: int
+    __status: AlertDefinitionStatus
     __last_check: datetime
     __calculator: AlertCalculator
     __notification: AlertNotification
@@ -936,12 +1015,12 @@ class AlertDefinition:
         self.__description = setup["description"]
         self.__category_id = setup["category_id"]
         self.__level = Level[setup["level"]]
+        self.__status = AlertDefinitionStatus[setup["status"]]
         self.__meter_ids = setup["meter_ids"]
         self.set_definition_flags_from_str_flags(flags_list=setup["flags"])
-        self.__last_check = utility.get_datetime_from_iso_str(setup["last_check"])
+        self.__last_check = utils.get_datetime_from_iso_str(setup["last_check"])
         self.__notification = AlertNotification(setup=setup["notification"])
         self.__calculator = AlertCalculator(setup=setup["calculator"], today=today, last_check=self.last_check)
-
 
     @property
     def is_active(self) -> bool:
@@ -956,8 +1035,10 @@ class AlertDefinition:
         :type today datetime
 
         """
-        for meter_id in self.meter_ids:
-            if self.calculator.is_alert_situation(meter_id=meter_id):
+        results = self.find_is_index(meter_ids=self.meter_ids)
+        for meter_id, is_index in results:
+            print("id = {} is_idx = {}".format(id, is_index))
+            if self.calculator.is_alert_situation(meter_id=meter_id, is_index=bool(is_index)):
                 alert = Alert(
                     alert_definition_description=self.description,
                     value=self.calculator.value,
@@ -969,18 +1050,28 @@ class AlertDefinition:
                 if self.notification.is_notification_allowed(datetime_to_check=today):
                     pass  # TODO NOTIFY
 
+    def find_is_index(self, meter_ids):
+        format_param = ", ".join(["%s" for m in meter_ids])
+        print(format_param)
+        query = "select id, IS_INDEX from {} where id IN ({})".format(METER_TABLE_NAME, format_param)
+        print(query)
+        my_cursor = my_sql.generate_cursor()
+        my_cursor.execute(operation=query, params=meter_ids)
+        return my_cursor.fetchall()
+
+
     # DEFINITION FLAG
     def has_definition_flag(self, flag: AlertDefinitionFlag):
-        return bool(flag.value & self.__alert_definition_flag)
+        return bool(flag.value & self.__flag)
 
     def add_definition_flag(self, flag: AlertDefinitionFlag):
-        self.__alert_definition_flag |= flag.value
+        self.__flag |= flag.value
 
     def reset_definition_flag(self):
-        self.__alert_definition_flag = AlertDefinitionFlag.INACTIVE.value
+        self.__flag = AlertDefinitionFlag.INACTIVE.value
 
     def remove_definition_flag(self, flag: AlertDefinitionFlag):
-        self.__alert_definition_flag ^= flag.value
+        self.__flag ^= flag.value
 
     def set_definition_flags_from_str_flags(self, flags_list: array):
         self.reset_definition_flag()
@@ -990,7 +1081,7 @@ class AlertDefinition:
 
     @property
     def definition_flag(self):
-        return self.__alert_definition_flag
+        return self.__flag
 
     @property
     def name(self):

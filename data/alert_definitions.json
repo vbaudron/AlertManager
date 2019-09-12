@@ -8,6 +8,7 @@
   "category_id": "category_1",
   "description" : "i am supposed to describe the Alert definition",
   "level" : "LOW",
+  "status" : "ACTIVE",
   "flags": [
     "ACTIVE"
   ],
