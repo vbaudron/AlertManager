@@ -957,19 +957,10 @@ class Alert:
 
 # -----------------------------------------------   ALERT DEFINITION   -------------------------------------------------
 
-# STATUS
-@unique
-class AlertDefinitionStatus(Enum):  # USELESS --> Has Been moved to FLAG
-    INACTIVE = 0
-    ACTIVE = auto()
-    ARCHIVE = auto()
-
-
 # FLAG
 @unique
 class AlertDefinitionFlag(Flag):
-    INACTIVE = 0  # Nothing
-    ACTIVE = auto()  # Replace status
+    NONE = 0  # Nothing
     SAVE_ALL = auto()  # Always calculate Alert even if notification not allowed & if alert exist, save it
     ANOTHER_FLAG = auto()  # Flag to Test - Do not forget to Refactor when change it
 
@@ -1068,7 +1059,7 @@ class AlertDefinition:
         self.__flag |= flag.value
 
     def reset_definition_flag(self):
-        self.__flag = AlertDefinitionFlag.INACTIVE.value
+        self.__flag = AlertDefinitionFlag.NONE.value
 
     def remove_definition_flag(self, flag: AlertDefinitionFlag):
         self.__flag ^= flag.value
