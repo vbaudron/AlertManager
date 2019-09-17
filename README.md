@@ -66,14 +66,6 @@ class AlertDefinitionStatus(Enum):
     ACTIVE = 1
 ```
 
-### Flag
-```python
-@unique
-class AlertDefinitionFlag(Flag):
-    INACTIVE = 0           # Nothing
-    ACTIVE = auto()        # Replace status
-```
-
 ### Meter Id
 This is the list of the meter id (the primary key from the table *BI_COMPTEURS*) concerned by the alertDefinition.
 
