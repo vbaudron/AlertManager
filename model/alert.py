@@ -260,11 +260,11 @@ class DataBaseValueGenerator(ABC):
         super().__init__()
 
     @abstractmethod
-    def get_value_in_db(self, meter_id: int):
+    def get_value_in_db(self, meter_id: int, is_index: bool):
         raise NotImplementedError
 
-    def calculate_value(self, meter_id: int):
-        self._value = self.get_value_in_db(meter_id=meter_id)
+    def calculate_value(self, meter_id: int, is_index: bool):
+        self._value = self.get_value_in_db(meter_id=meter_id, is_index=is_index)
 
 
 class SimpleDBBasedValueGenerator(DataBaseValueGenerator, ValueGenerator):  # GOAL
@@ -290,9 +290,9 @@ class PeriodBasedValueGenerator(DataBaseValueGenerator, ValueGenerator):
         period_generator = UserBasedPeriodGenerator(user_data=user_data, today=today)
         self.__period = period_generator.get_pertinent_period()
 
-    def get_value_in_db(self, meter_id: int):
+    def get_value_in_db(self, meter_id: int, is_index: bool):
         hdl = HandleDataFromDB(period=self.__period)
-        result = hdl.get_data_from_db(meter_id=meter_id)
+        result = hdl.get_data_from_db(meter_id=meter_id, is_index=is_index)
         return self.__operator.calculate(result)
 
 
@@ -337,8 +337,8 @@ class AlertValue:
         elif self.value_generator_type is ValueGeneratorType.SIMPLE_DB_BASED_VALUE:
             self.__value_generator = SimpleDBBasedValueGenerator()
 
-    def calculate_value(self, meter_id: int):
-        self.value_generator.calculate_value(meter_id=meter_id)
+    def calculate_value(self, meter_id: int, is_index: bool):
+        self.value_generator.calculate_value(meter_id=meter_id, is_index=is_index)
 
     @property
     def value_number(self):
@@ -451,8 +451,6 @@ class HandleDataFromDB:
         for row in iter_row(my_cursor, 10):
             result.append(row[0])
 
-        my_sql.close()
-
         return result
 
     def __aggregate_result(self, result):
@@ -511,8 +509,8 @@ class AlertCalculator:
             raise ConfigError(self, "acceptable_diff and ValueGeneratorType.USER_BASED_VALUE not compatible")
 
     # -- Find Value that will be Compare with Data --
-    def __get_value(self, meter_id: int):
-        self.__alert_value.calculate_value(meter_id=meter_id)
+    def __get_value(self, meter_id: int, is_index: bool):
+        self.__alert_value.calculate_value(meter_id=meter_id, is_index=is_index)
         if self.acceptable_diff:
             return self.comparator.get_new_value(
                 value=self.alert_value.value,
@@ -521,8 +519,12 @@ class AlertCalculator:
         return self.alert_value.value
 
     def is_alert_situation(self, meter_id: int, is_index: bool) -> bool:
-        self.__data = self.__operator.calculate(self.alert_data.get_all_data_in_db(meter_id=meter_id, is_index=is_index))
-        self.__value = self.__get_value(meter_id=meter_id)
+        data_from_db = self.alert_data.get_all_data_in_db(meter_id=meter_id, is_index=is_index)
+        if not data_from_db:
+            log.warning("no data found in db for meter id {}".format(meter_id))
+            return False
+        self.__data = self.__operator.calculate(data_from_db)
+        self.__value = self.__get_value(meter_id=meter_id, is_index=is_index)
         return self.comparator.compare(self.data, self.value)
 
     # --- PROPERTIES ---
@@ -974,7 +976,7 @@ class AlertDefinitionStatus(Enum):
 @unique
 class Level(Enum):
     LOW = 0
-    HIGH = auto()
+    HIGH = 1
 
 
 # CLASS
@@ -1015,7 +1017,7 @@ class AlertDefinition:
 
     @property
     def is_active(self) -> bool:
-        return self.has_definition_flag(AlertDefinitionFlag.ACTIVE)
+        return self.__status is AlertDefinitionStatus.ACTIVE
 
     # CHECK
     def check(self, today: datetime):
@@ -1110,6 +1112,7 @@ class AlertDefinition:
     def last_check(self):
         return self.__last_check
 
+
 # ---------------------------------------------------------------------------------------------------------------------
 
 
@@ -1132,6 +1135,10 @@ class AlertManager:
             except (KeyError, ConfigError) as error:
                 log.warning(error.__str__())
 
+    def request_alert_definition(self):
+        base = "SELECT *"
+
+
     def start(self):
         for alert_definition in self.alert_definition_list:
             if alert_definition.is_active:
@@ -1139,12 +1146,6 @@ class AlertManager:
 
     def save(self):
         pass  # TODO
-
-    @staticmethod
-    def start_manager():
-        alert_manager = AlertManager()
-        alert_manager.start()
-        alert_manager.save()
 
     @property
     def alert_definition_list(self):
@@ -1155,5 +1156,7 @@ class AlertManager:
         return self.__today
 
 
-if __name__ == '__main__':
-    AlertManager.start_manager()
+def start():
+    alert_manager = AlertManager()
+    alert_manager.start()
+    alert_manager.save()
