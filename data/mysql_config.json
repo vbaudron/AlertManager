@@ -1,6 +1,7 @@
 {
   "host": "localhost",
-  "username": "test_username",
-  "password": "test_password",
-  "database": "jci_test"
+  "port": 8889,
+  "username": "root",
+  "password": "root",
+  "database": "bd_dev"
 }

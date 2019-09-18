@@ -86,6 +86,7 @@ class MySqlConnection:
     __username: str
     __password: str
     __database: str
+    __port: str
 
     __open_time: datetime
 
@@ -116,6 +117,7 @@ class MySqlConnection:
         self.__username = setup["username"]
         self.__password = setup["password"]
         self.__database = setup["database"]
+        self.__port = setup["port"]
 
     # CONNECTION
     def __connect(self):
@@ -123,7 +125,8 @@ class MySqlConnection:
             host=self.host,
             user=self.username,
             password=self.password,
-            db=self.database
+            db=self.database,
+            port=self.__port
         )
         log.debug("connected")
         print("connected")
