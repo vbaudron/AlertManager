@@ -2,12 +2,7 @@ import random
 
 from model.alert import HandleDataFromDB
 from datetime import datetime, timedelta
-from model.utils import my_sql , ALERT_TABLE_COMPO, ALERT_TABLE_NAME, ALERT_FOREIGN_KEY, \
-    METER_TABLE_NAME, TableToGenerate
-import logging as log
-
-
-
+from model.utils import my_sql, METER_TABLE_NAME, TableToGenerate
 
 
 def __generate_valeur_comptage_table_query():
@@ -30,14 +25,16 @@ def create_BI_COMPTAGE_DONNEE_table():
     return TableToGenerate.check_if_table_created(table_name=HandleDataFromDB.table_name)
 
 
-
-def insert_data_in_BI_COMPTAGE_DONNEE_table():
-    select_base = "INSERT INTO {} ({}, {}, {}) VALUES (%s, %s, %s)".format(
+def get_insert_base_BI_COMPTAGE_DONNEE_table():
+    return "INSERT INTO {} ({}, {}, {}) VALUES (%s, %s, %s)".format(
         HandleDataFromDB.table_name,
         HandleDataFromDB.value_column_name,
         HandleDataFromDB.meter_id_column_name,
         HandleDataFromDB.hour_column_name
     )
+
+def insert_random_data_in_BI_COMPTAGE_DONNEE_table():
+    insert_base = get_insert_base_BI_COMPTAGE_DONNEE_table()
 
     def get_comptage(comptage):
         if comptage > 100:
@@ -67,7 +64,27 @@ def insert_data_in_BI_COMPTAGE_DONNEE_table():
     values = __generate_values()
 
     for value in values:
-        my_sql.execute_and_close(query=select_base, params=value)
+        my_sql.execute_and_close(query=insert_base, params=value)
+
+
+def insert_data_to_test_in_BI_COMPTAGE_DONNEE_table():
+    insert_base = get_insert_base_BI_COMPTAGE_DONNEE_table()
+
+    meter_id = 4
+    values = list()
+    comptage_list = [3, 2, 5, 1, 4]
+    start_day = datetime.today() - timedelta(days=1)
+
+    for comtage in comptage_list:
+        start_day += timedelta(hours=1)
+        values.append((
+            comtage,
+            meter_id,
+            start_day
+        ))
+
+    for value in values:
+        my_sql.execute_and_close(query=insert_base, params=value)
 
 
 # --------------------------------------------    BI_COMPTEURS
@@ -98,7 +115,7 @@ def insert_data_in_BI_COMPTEUR_table():
     print(select_base)
 
     def __generate_values():
-        values = list()ssh
+        values = list()
         my_bool = [0, 1]
         i = 1
         while len(values) < 10:
@@ -126,7 +143,32 @@ def create_all_fake():
 
         # BI DONNEE COMPTAGE
         if create_BI_COMPTAGE_DONNEE_table():
-            insert_data_in_BI_COMPTAGE_DONNEE_table()
+            insert_data_to_test_in_BI_COMPTAGE_DONNEE_table()
+
+
+def query_construction(self, compo, name):
+    # PARAMS
+    params_list = list(key for key, value in compo.items())
+    params_list.pop(0)
+    params_str = ", ".join([param for param in params_list])
+
+    # Format
+    format_param = ", ".join(["%s" for param in params_list])
+
+    # QUERY
+    query = "INSERT INTO {} ({}) VALUES ({})".format(name, params_str, format_param)
+    print(query)
+    return query
+
+
+# --------------------------------------------    BI_ALERT_DEFINITION
+def create_alert_def_and_other_data():
+    alert_def = "INSERT INTO {} () "
+
+
+
+
+
 
 if __name__ == '__main__':
     create_all_fake()

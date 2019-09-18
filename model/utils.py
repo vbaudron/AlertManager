@@ -1,20 +1,14 @@
 import calendar
+import datetime
 import json
-import os.path
-import sys
-from abc import ABC
-from enum import Enum
 import logging as log
-from typing import Any, Union
+import os.path
+from enum import Enum
 
 import dateutil.parser
-import mysql.connector
-from mysql.connector import errorcode, MySQLConnection
-
-import datetime
+from mysql.connector import MySQLConnection
 
 from definition import ROOT_DIR
-
 
 # _______________________________________________ PATH _________________________________________________________________
 
@@ -145,7 +139,6 @@ class MySqlConnection:
         my_cursor.execute(operation=query, params=params)
         my_sql.commit()
         my_cursor.close()
-        my_sql.close()
 
     def commit(self):
         self.__connection.commit()
@@ -273,10 +266,10 @@ METER_TABLE_NAME = "BI_COMPTEURS"
 
 # ---- #     Notification DEFINITION    # ---- #
 
-NOTIFICATION_NAME = "BI_NOTIFICATIONS_ALERT"
+NOTIFICATION_NAME = "bi_notification_alert"
 NOTIFICATION_COMPO = {
     "id": "INT AUTO_INCREMENT PRIMARY KEY",
-    "period_type": "VARCHAR(255)",
+    "period_type": "VARCHAR(5)",
     "number": "DOUBLE",
     "email": "VARCHAR(255)",
     "days_flag": "INT",
@@ -286,7 +279,7 @@ NOTIFICATION_COMPO = {
 
 # ---- #     CALCULATOR DEFINITION    # ---- #
 
-CALCULATOR_NAME = "BI_CALCULATORS_ALERT"
+CALCULATOR_NAME = "bi_calculator_alert"
 CALCULATOR_COMPO = {
     "id": "INT AUTO_INCREMENT PRIMARY KEY",
     "operator": "VARCHAR(255)",
@@ -301,33 +294,16 @@ CALCULATOR_COMPO = {
     "value_period_unit": "VARCHAR(255)",
 }
 
-# ---- #     CATEGORY_ALERT     # ---- #
-
-CATEGORY_ALERT_TABLE_NAME = "BI_CATEGORY_ALERTS"
-
-CATEGORY_COMPO = {
-    "id": "INT AUTO_INCREMENT PRIMARY KEY",
-    "label": "VARCHAR(255)"
-}
-
-# ---- #     LEVEL_ALERT     # ---- #
-
-LEVEL_ALERT_TABLE_NAME = "BI_CATEGORY_ALERTS"
-
-LEVEL_COMPO = {
-    "id": "INT AUTO_INCREMENT PRIMARY KEY",
-    "label": "VARCHAR(255)"
-}
-
 # ---- #     DEFINITION ALERTS   # ---- #
 
-DEFINITION_TABLE_NAME = "BI_ALERTS_DEFINITION"
+DEFINITION_TABLE_NAME = "bi_definition_alert"
 DEFINITION_COMPO = {
     "id": "INT AUTO_INCREMENT PRIMARY KEY",
     "name": "VARCHAR(255)",
     "category": "VARCHAR(255)",
-    "level": "INT",  # VS VARcHAR
-    "status": "INT",  # VS VARCHAR
+    "level": "INT",
+    "status": "INT",
+    "last_notification_time": "DATETIME",
     "notification_id": "INT",
     "calculator_id": "INT"
 }
@@ -336,22 +312,22 @@ DEFINITON_ALERT_FOREIGN_KEY = [
     "FOREIGN KEY (calculator_id) REFERENCES {}(id)".format(CALCULATOR_NAME)
 ]
 
-# ---- #     BI_COMPTEURS_DEFINITIONS_ALERTS     # ---- #
+# ---- #     BI_METERS_DEFINITIONS_ALERTS     # ---- #
 
-COMPTEURS_DEFINITIONS_ALERT_TABLE_NAME = "BI_COMPTEURS_DEFINITIONS_ALERTS"
+METER_DEFINITIONS_ALERT_TABLE_NAME = "bi_meter_definition_alert"
 
-COMPTEUR_DEFINITION_COMPO = {
+METER_DEFINITION_COMPO = {
     "meter_id": "INT",
     "definition_alert_id": "INT"
 }
-COMPTEUR_DEFINITON_ALERT_FOREIGN_KEY = [
+METER_DEFINITION_ALERT_FOREIGN_KEY = [
     "FOREIGN KEY (meter_id) REFERENCES {}(id)".format(METER_TABLE_NAME),
     "FOREIGN KEY (alert_definition_id) REFERENCES {}(id)".format(DEFINITION_TABLE_NAME)
 ]
 
 # ---- #     Alert      # ---- #
 
-ALERT_TABLE_NAME = "BI_ALERTS"
+ALERT_TABLE_NAME = "bi_alert"
 
 ALERT_TABLE_COMPO = {
     "id": "INT AUTO_INCREMENT PRIMARY KEY",
@@ -371,6 +347,7 @@ ALERT_FOREIGN_KEY = [
 
 
 # ______________________________________________________________________________________________________________________
+
 
 if __name__ == '__main__':
     pass
