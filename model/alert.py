@@ -578,13 +578,13 @@ class AlertCalculator:
 @unique
 class Day(Flag):
     NONE = 0
-    MONDAY = auto()
-    TUESDAY = auto()
-    WEDNESDAY = auto()
-    THURSDAY = auto()
-    FRIDAY = auto()
-    SATURDAY = auto()
-    SUNDAY = auto()
+    MONDAY = 1
+    TUESDAY = 2
+    WEDNESDAY = 4
+    THURSDAY = 8
+    FRIDAY = 16
+    SATURDAY = 32
+    SUNDAY = 64
 
     @staticmethod
     def str_values():
@@ -604,30 +604,30 @@ class NotificationPeriod(Enum):
 @unique
 class Hour(Flag):
     NONE = 0
-    H_0 = auto()
-    H_1 = auto()
-    H_2 = auto()
-    H_3 = auto()
-    H_4 = auto()
-    H_5 = auto()
-    H_6 = auto()
-    H_7 = auto()
-    H_8 = auto()
-    H_9 = auto()
-    H_10 = auto()
-    H_11 = auto()
-    H_12 = auto()
-    H_13 = auto()
-    H_14 = auto()
-    H_15 = auto()
-    H_16 = auto()
-    H_17 = auto()
-    H_18 = auto()
-    H_19 = auto()
-    H_20 = auto()
-    H_21 = auto()
-    H_22 = auto()
-    H_23 = auto()
+    H_0 = pow(2, 0)
+    H_1 = pow(2, 1)
+    H_2 = pow(2, 2)
+    H_3 = pow(2, 3)
+    H_4 = pow(2, 4)
+    H_5 = pow(2, 5)
+    H_6 = pow(2, 6)
+    H_7 = pow(2, 7)
+    H_8 = pow(2, 8)
+    H_9 = pow(2, 9)
+    H_10 = pow(2, 10)
+    H_11 = pow(2, 11)
+    H_12 = pow(2, 12)
+    H_13 = pow(2, 13)
+    H_14 = pow(2, 14)
+    H_15 = pow(2, 15)
+    H_16 = pow(2, 16)
+    H_17 = pow(2, 17)
+    H_18 = pow(2, 18)
+    H_19 = pow(2, 19)
+    H_20 = pow(2, 20)
+    H_21 = pow(2, 21)
+    H_22 = pow(2, 22)
+    H_23 = pow(2, 23)
 
     @staticmethod
     def get_from_int(number: int):
