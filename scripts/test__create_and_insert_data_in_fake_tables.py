@@ -163,7 +163,7 @@ def query_construction(self, compo, name):
 
 # --------------------------------------------    BI_ALERT_DEFINITION
 def create_alert_def_and_other_data():
-    alert_def = "INSERT INTO {} () "
+    alert_def = query_construction(compo=Ale)
 
 
 
