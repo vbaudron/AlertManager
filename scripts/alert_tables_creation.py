@@ -46,7 +46,8 @@ if __name__ == '__main__':
         notification_table,
         calculator_table,
         definition_table,
-        alert_table
+        alert_table,
+        definition_meter_table
     ]
 
     for table in tables:

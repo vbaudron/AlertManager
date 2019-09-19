@@ -269,46 +269,44 @@ METER_TABLE_NAME = "BI_COMPTEURS"
 
 # ---- #     Notification DEFINITION    # ---- #
 
-NOTIFICATION_NAME = "bi_notification_alert"
+NOTIFICATION_NAME = "alert_notification"
 NOTIFICATION_COMPO = {
     "id": "INT AUTO_INCREMENT PRIMARY KEY",
-    "period_type": "VARCHAR(5)",
-    "number": "DOUBLE",
+    "period_unit": "VARCHAR(8)",
+    "period_quantity": "INT",
     "email": "VARCHAR(255)",
-    "days_flag": "INT",
-    "hours_flag": "INT",
-
+    "days_flag": "INT DEFAULT 0",
+    "hours_flag": "INT DEFAULT 0"
 }
 
 # ---- #     CALCULATOR DEFINITION    # ---- #
 
-CALCULATOR_NAME = "bi_calculator_alert"
+CALCULATOR_NAME = "alert_calculator"
 CALCULATOR_COMPO = {
     "id": "INT AUTO_INCREMENT PRIMARY KEY",
-    "operator": "VARCHAR(255)",
-    "comparator": "VARCHAR(255)",
-    "email": "BOOLEAN",
-    "data_period_type": "VARCHAR(255)",
+    "operator": "VARCHAR(8)",
+    "comparator": "VARCHAR(8)",
+    "data_period_type": "VARCHAR(16)",
     "data_period_quantity": "INT",
-    "data_period_unit": "VARCHAR(255)",
-    "value_type": "VARCHAR(255)",
-    "value_number": "VARCHAR(255)",
+    "data_period_unit": "VARCHAR(8)",
+    "value_type": "VARCHAR(32)",
+    "value_number": "DOUBLE",
     "value_period_quantity": "INT",
-    "value_period_unit": "VARCHAR(255)",
+    "value_period_unit": "VARCHAR(8)"
 }
 
 # ---- #     DEFINITION ALERTS   # ---- #
 
-DEFINITION_TABLE_NAME = "bi_definition_alert"
+DEFINITION_TABLE_NAME = "alert_definition"
 DEFINITION_COMPO = {
     "id": "INT AUTO_INCREMENT PRIMARY KEY",
     "name": "VARCHAR(255)",
     "category": "VARCHAR(255)",
     "level": "INT",
-    "status": "INT",
+    "status": "INT DEFAULT 0",
     "last_notification_time": "DATETIME",
-    "notification_id": "INT",
-    "calculator_id": "INT"
+    "notification_id": "INT NOT NULL",
+    "calculator_id": "INT NOT NULL"
 }
 DEFINITON_ALERT_FOREIGN_KEY = [
     "FOREIGN KEY (notification_id) REFERENCES {}(id)".format(NOTIFICATION_NAME),
@@ -317,11 +315,11 @@ DEFINITON_ALERT_FOREIGN_KEY = [
 
 # ---- #     BI_METERS_DEFINITIONS_ALERTS     # ---- #
 
-METER_DEFINITIONS_ALERT_TABLE_NAME = "bi_meter_definition_alert"
+METER_DEFINITIONS_ALERT_TABLE_NAME = "alert_definition_meter"
 
 METER_DEFINITION_COMPO = {
     "meter_id": "INT",
-    "definition_alert_id": "INT"
+    "alert_definition_id": "INT"
 }
 METER_DEFINITION_ALERT_FOREIGN_KEY = [
     "FOREIGN KEY (meter_id) REFERENCES {}(id)".format(METER_TABLE_NAME),
@@ -330,11 +328,12 @@ METER_DEFINITION_ALERT_FOREIGN_KEY = [
 
 # ---- #     Alert      # ---- #
 
-ALERT_TABLE_NAME = "bi_alert"
+ALERT_TABLE_NAME = "alert_alert"
 
 ALERT_TABLE_COMPO = {
     "id": "INT AUTO_INCREMENT PRIMARY KEY",
-    "datetime": "DATETIME NOT NULL",
+    "creation_date": "DATETIME NOT NULL",
+    "modification_date": "DATETIME NOT NULL",
     "data": "DOUBLE",
     "value": "DOUBLE",
     "status": "TINYINT",
