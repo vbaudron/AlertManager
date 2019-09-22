@@ -1,7 +1,8 @@
 from model.utils import TableToGenerate, ALERT_TABLE_NAME, ALERT_FOREIGN_KEY, ALERT_TABLE_COMPO, NOTIFICATION_NAME, \
     NOTIFICATION_COMPO, DEFINITION_TABLE_NAME, DEFINITON_ALERT_FOREIGN_KEY, DEFINITION_COMPO, CALCULATOR_NAME, \
     CALCULATOR_COMPO, METER_DEFINITIONS_ALERT_TABLE_NAME, METER_DEFINITION_COMPO, \
-    METER_DEFINITION_ALERT_FOREIGN_KEY
+    METER_DEFINITION_ALERT_FOREIGN_KEY, ALERT_DEFINITION_NOTIFICATION_TIME, ALERT_DEFINITION_NOTIFICATION_TIME_COMPO, \
+    ALERT_DEFINITION_NOTIFICATION_TIME_FOREIGN_KEY
 
 # NOTIFICATION
 notification_table = TableToGenerate(
@@ -33,24 +34,40 @@ alert_table = TableToGenerate(
     foreign_keys=ALERT_FOREIGN_KEY
 )
 
+# ALERT_DEFINITION METER
 definition_meter_table = TableToGenerate(
     table_name=METER_DEFINITIONS_ALERT_TABLE_NAME,
     compo=METER_DEFINITION_COMPO,
     foreign_keys=METER_DEFINITION_ALERT_FOREIGN_KEY
 )
 
-# CREATE TABLES
-if __name__ == '__main__':
+# ALERT_DEFINITION NOTIFICATION TIME
 
+definition_notification_table = TableToGenerate(
+    table_name=ALERT_DEFINITION_NOTIFICATION_TIME,
+    compo=ALERT_DEFINITION_NOTIFICATION_TIME_COMPO,
+    foreign_keys=ALERT_DEFINITION_NOTIFICATION_TIME_FOREIGN_KEY
+)
+
+
+# CREATE TABLES
+def create_tables():
     tables = [
         notification_table,
         calculator_table,
         definition_table,
         alert_table,
-        definition_meter_table
+        definition_meter_table,
+        definition_notification_table
     ]
 
     for table in tables:
         print(table, " start creation ...")
         table.request_table_creation()
+
+
+# CREATE TABLES
+if __name__ == '__main__':
+    create_tables()
+
 

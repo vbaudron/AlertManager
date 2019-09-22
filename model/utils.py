@@ -259,13 +259,13 @@ class TableToGenerate:
             log.debug("{} table exists".format(table_name))
             return True
         else:
-            log.error("{} table NOT created".format(table_name))
+            log.error("{} table does NOT exist".format(table_name))
             return False
 
 
 # _______________________________________________ Table Creation _______________________________________________________
 
-METER_TABLE_NAME = "BI_COMPTEURS"
+METER_TABLE_NAME = "bi_compteurs"
 
 # ---- #     Notification DEFINITION    # ---- #
 
@@ -284,15 +284,16 @@ NOTIFICATION_COMPO = {
 CALCULATOR_NAME = "alert_calculator"
 CALCULATOR_COMPO = {
     "id": "INT AUTO_INCREMENT PRIMARY KEY",
-    "operator": "VARCHAR(8)",
-    "comparator": "VARCHAR(8)",
-    "data_period_type": "VARCHAR(16)",
+    "operator": "VARCHAR(8) NOT NULL",
+    "comparator": "VARCHAR(8) NOT NULL",
+    "data_period_type": "VARCHAR(16) NOT NULL",
     "data_period_quantity": "INT",
     "data_period_unit": "VARCHAR(8)",
     "value_type": "VARCHAR(32)",
     "value_number": "DOUBLE",
     "value_period_quantity": "INT",
-    "value_period_unit": "VARCHAR(8)"
+    "value_period_unit": "VARCHAR(8)",
+    "acceptable_diff": "BOOLEAN DEFAULT 0"
 }
 
 # ---- #     DEFINITION ALERTS   # ---- #
@@ -303,8 +304,7 @@ DEFINITION_COMPO = {
     "name": "VARCHAR(255)",
     "category": "VARCHAR(255)",
     "level": "INT",
-    "status": "INT DEFAULT 0",
-    "last_notification_time": "DATETIME",
+    "status": "TINYINT NOT NULL DEFAULT 0",
     "notification_id": "INT NOT NULL",
     "calculator_id": "INT NOT NULL"
 }
@@ -318,6 +318,7 @@ DEFINITON_ALERT_FOREIGN_KEY = [
 METER_DEFINITIONS_ALERT_TABLE_NAME = "alert_definition_meter"
 
 METER_DEFINITION_COMPO = {
+    "id": "INT AUTO_INCREMENT PRIMARY KEY",
     "meter_id": "INT",
     "alert_definition_id": "INT"
 }
@@ -346,7 +347,20 @@ ALERT_FOREIGN_KEY = [
     "FOREIGN KEY (alert_definition_id) REFERENCES {}(id)".format(DEFINITION_TABLE_NAME)
 ]
 
+# ---- #     Alert Definition Notification      # ---- #
+ALERT_DEFINITION_NOTIFICATION_TIME = "alert_definition_notification_time"
 
+ALERT_DEFINITION_NOTIFICATION_TIME_COMPO = {
+    "id": "INT AUTO_INCREMENT PRIMARY KEY",
+    "notification_id": "INT NOT NULL",
+    "alert_definition_id": "INT NOT NULL",
+    "notification_time": "DATETIME NOT NULL"
+}
+
+ALERT_DEFINITION_NOTIFICATION_TIME_FOREIGN_KEY = [
+    "FOREIGN KEY (notification_id) REFERENCES {}(id)".format(NOTIFICATION_NAME),
+    "FOREIGN KEY (alert_definition_id) REFERENCES {}(id)".format(DEFINITION_TABLE_NAME)
+]
 
 # ______________________________________________________________________________________________________________________
 
