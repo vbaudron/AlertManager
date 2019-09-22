@@ -12,6 +12,8 @@ from datetime import datetime, timedelta
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
+from mysql.connector.cursor import MySQLCursor
+
 from model import utils
 from model.my_exception import EnumError, ConfigError
 from model.utils import get_day_name_from_datetime, get_data_from_json_file, get_str_from_file, \
@@ -415,10 +417,10 @@ class AlertData:
 
 
 class HandleDataFromDB:
-    table_name = "BI_DONNESCOMPTAGE"
-    value_column_name = "VALEUR"
-    meter_id_column_name = "R_COMPTEUR"
-    hour_column_name = "DATE_HEURE"
+    table_name = "bi_donneescomptage"
+    value_column_name = "valeur"
+    meter_id_column_name = "r_compteurs"
+    hour_column_name = "date_heure"
 
     __period: Period
 
@@ -1118,14 +1120,12 @@ class AlertDefinition:
 
 class AlertManager:
 
-    FILENAME = "alert_definitions.json"
-
     __alert_definition_list: list
     __today: datetime
 
     def __init__(self):
         self.__today = datetime.today()
-        data = get_data_from_json_file(get_path_in_data_folder_of(AlertManager.FILENAME))
+        data = self.get_alert_def_in_db()
         self.__alert_definition_list = list()
 
         for setup in data:
@@ -1135,17 +1135,53 @@ class AlertManager:
             except (KeyError, ConfigError) as error:
                 log.warning(error.__str__())
 
-    def request_alert_definition(self):
-        base = "SELECT *"
-
-
     def start(self):
         for alert_definition in self.alert_definition_list:
             if alert_definition.is_active:
                 alert_definition.check(today=self.today)
 
-    def save(self):
-        pass  # TODO
+    @staticmethod
+    def get_alert_def_in_db():
+        query = """select d.*, 
+                n.period_unit "notification_period_unit", n.period_quantity "notification_period_quantity", 
+                n.email "notification_email", n.days_flag "notification_days", n.hours_flag "notification_hours", 
+                c.operator, c.comparator, c.data_period_type, c.data_period_quantity, c.data_period_unit, 
+                c.value_type, c.value_number, c.value_period_quantity, c.value_period_unit, dm.meter_id 
+                from alert_definition d 
+                LEFT JOIN alert_definition_meter dm ON d.id=dm.alert_definition_id 
+                LEFT JOIN alert_notification n ON d.notification_id=n.id 
+                LEFT jOIN alert_calculator c ON d.calculator_id=c.id 
+                WHERE d.status=%s """
+        params = [AlertDefinitionStatus.ACTIVE.value]
+
+        cursor = my_sql.generate_cursor()
+        cursor.execute(operation=query, params=params)
+
+        return AlertManager.__handle_result(cursor=cursor)
+
+    @staticmethod
+    def __handle_result(cursor: MySQLCursor):
+        column_names = cursor.column_names
+        results = cursor.fetchall()
+
+        tmp = {}
+
+        # Merge meter id on the same AlertDefinition
+        for result in results:
+            i = 0
+            id_def = result[0]
+            if id_def not in tmp.keys():
+                tmp[id_def] = {}
+                tmp[id_def]["meter_ids"] = []
+            while i < len(column_names):
+                if column_names[i] == "meter_id":
+                    tmp[id_def]["meter_ids"].append(result[i])
+                else:
+                    tmp[id_def][column_names[i]] = result[i]
+                i += 1
+
+        # make array
+        return [tmp[key] for key in tmp.keys()]
 
     @property
     def alert_definition_list(self):
@@ -1154,6 +1190,7 @@ class AlertManager:
     @property
     def today(self):
         return self.__today
+
 
 
 def start():

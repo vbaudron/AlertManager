@@ -1,8 +1,12 @@
 import random
 
-from model.alert import HandleDataFromDB
+from model.alert import HandleDataFromDB, PeriodUnitDefinition, MyOperator, MyComparator, PeriodGeneratorType, \
+    ValueGeneratorType, Level, AlertStatus, AlertDefinitionStatus, Day, Hour
 from datetime import datetime, timedelta
-from model.utils import my_sql, METER_TABLE_NAME, TableToGenerate
+from model.utils import my_sql, METER_TABLE_NAME, TableToGenerate, NOTIFICATION_COMPO, NOTIFICATION_NAME, \
+    CALCULATOR_COMPO, CALCULATOR_NAME, DEFINITION_COMPO, DEFINITION_TABLE_NAME, METER_DEFINITION_COMPO, \
+    METER_DEFINITIONS_ALERT_TABLE_NAME
+from scripts.alert_tables_creation import create_tables
 
 
 def __generate_valeur_comptage_table_query():
@@ -135,20 +139,11 @@ def insert_data_in_BI_COMPTEUR_table():
         my_sql.execute_and_close(query=select_base, params=value)
 
 
-# CREATE
-def create_all_fake():
-    # BI COMPTEUR
-    if create_BI_COMPTEUR_table():
-        insert_data_in_BI_COMPTEUR_table()
-
-        # BI DONNEE COMPTAGE
-        if create_BI_COMPTAGE_DONNEE_table():
-            insert_data_to_test_in_BI_COMPTAGE_DONNEE_table()
 
 
-def query_construction(self, compo, name):
+def query_construction(compo, name):
     # PARAMS
-    params_list = list(key for key, value in compo.items())
+    params_list = list(key for key in compo.keys())
     params_list.pop(0)
     params_str = ", ".join([param for param in params_list])
 
@@ -162,9 +157,121 @@ def query_construction(self, compo, name):
 
 
 # --------------------------------------------    BI_ALERT_DEFINITION
-def create_alert_def_and_other_data():
-    alert_def = query_construction(compo=Ale)
 
+def insert_in_notification(period_unit: str, period_quantity: int, email: str, days_flags: int, hours_flags: int):
+    query = query_construction(compo=NOTIFICATION_COMPO, name=NOTIFICATION_NAME)
+    params = [
+        period_unit,
+        period_quantity,
+        email,
+        days_flags,
+        hours_flags,
+    ]
+    print("query", query)
+    print("params", params)
+    my_sql.execute_and_close(query=query, params=params)
+
+
+def insert_in_calculator(operator, comparator, data_period_type, data_period_quantity, data_period_unit, value_type, value_number, value_period_quantity, value_period_unit, acceptable_diff):
+    query = query_construction(compo=CALCULATOR_COMPO, name=CALCULATOR_NAME)
+    params = [
+        operator,
+        comparator,
+        data_period_type,
+        data_period_quantity,
+        data_period_unit,
+        value_type,
+        value_number,
+        value_period_quantity,
+        value_period_unit,
+        acceptable_diff
+    ]
+    print("query", query)
+    print("params", params)
+    my_sql.execute_and_close(query=query, params=params)
+
+
+def insert_in_alert_definition(name, category, level, status, notification_id, calculator_id):
+    query = query_construction(compo=DEFINITION_COMPO, name=DEFINITION_TABLE_NAME)
+    params = [
+        name,
+        category,
+        level,
+        status,
+        notification_id,
+        calculator_id
+    ]
+    print("query", query)
+    print("params", params)
+    my_sql.execute_and_close(query=query, params=params)
+
+
+def insert_in_alert_definition_meter(meter_id: int, alert_definition_id: int):
+    query = query_construction(compo=METER_DEFINITION_COMPO, name=METER_DEFINITIONS_ALERT_TABLE_NAME)
+    params = [
+        meter_id,
+        alert_definition_id
+    ]
+    print("query", query)
+    print("params", params)
+    my_sql.execute_and_close(query=query, params=params)
+
+
+def create_alert_def_and_other_data():
+    # NOTIFICATION
+    insert_in_notification(
+        period_unit=PeriodUnitDefinition.DAY.name,
+        period_quantity=5,
+        email="virginie.baudron@gmail.com",
+        days_flags=Day.MONDAY.value | Day.SUNDAY.value,
+        hours_flags=Hour.H_2.value | Hour.H_3.value,
+    )
+
+    # CALCULATOR
+    insert_in_calculator(
+        operator=MyOperator.MAX.name,
+        comparator=MyComparator.SUP.name,
+        data_period_type=PeriodGeneratorType.USER_BASED.name,
+        data_period_quantity=4,
+        data_period_unit=PeriodUnitDefinition.DAY.name,
+        value_type=ValueGeneratorType.PERIOD_BASED_VALUE.name,
+        value_number=15,
+        value_period_quantity=1,
+        value_period_unit=PeriodUnitDefinition.WEEK.name,
+        acceptable_diff=False
+    )
+
+    # ALERT DEFINITION
+    insert_in_alert_definition(
+        name="definition_name_1",
+        category="definition_name_1",
+        level=Level.HIGH.value,
+        status=AlertDefinitionStatus.ACTIVE.value,
+        notification_id=1,
+        calculator_id=1
+    )
+
+    # DEFINITION METER
+    insert_in_alert_definition_meter(
+        meter_id=3,
+        alert_definition_id=1
+    )
+
+
+# CREATE
+def create_all_fake():
+    # BI COMPTEUR
+    if create_BI_COMPTEUR_table():
+        insert_data_in_BI_COMPTEUR_table()
+
+        # BI DONNEE COMPTAGE
+        if create_BI_COMPTAGE_DONNEE_table():
+            insert_data_to_test_in_BI_COMPTAGE_DONNEE_table()
+
+    if not TableToGenerate.check_if_table_created(table_name=DEFINITION_TABLE_NAME):
+        create_tables()
+
+    create_alert_def_and_other_data()
 
 
 
