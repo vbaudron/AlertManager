@@ -18,7 +18,7 @@ from model import utils
 from model.my_exception import EnumError, ConfigError
 from model.utils import get_day_name_from_datetime, get_data_from_json_file, get_str_from_file, \
     get_path_in_data_folder_of, my_sql, ALERT_TABLE_NAME, ALERT_TABLE_COMPO, \
-    SOURCE_PATH, iter_row, METER_TABLE_NAME
+    SOURCE_PATH, iter_row, METER_TABLE_NAME, NOTIFICATION_NAME
 from enum import Enum, auto, unique, Flag, IntEnum
 
 
@@ -642,6 +642,7 @@ class Hour(Flag):
 
 
 class AlertNotification:
+    __id: int
     __number: int
     __period: NotificationPeriod
     __email: str
@@ -649,17 +650,36 @@ class AlertNotification:
     __notification_hours: int
     __previous_notification_datetime: datetime
 
-    def __init__(self, setup: dict):
-        self.__number = setup["number"]
-        self.__period = NotificationPeriod[setup["period"]]
-        self.__email = setup["email"]
-        self.set_notification_days(setup["notification_days"])
-        self.set_notification_hours(setup["notification_hours"])
-        self.__previous_notification_datetime = utils.get_datetime_from_iso_str(setup["previous_notification_datetime"])
+    def __init__(self, notification_id: int, period_unit: str, period_quantity: int, email: str, hours: int, days: int):
+        self.__id = notification_id
+        self.__number = period_quantity
+        self.__period = NotificationPeriod[period_unit]
+        self.__email = email
+        self.__notification_hours = hours
+        self.__notification_days = days
+
+
+    def set_last_notification_time(self, alert_definition_id: int):
+        query = """ SELECT notification_time FROM {} 
+                    WHERE alert_definition_id=%s AND notification_id=%s 
+                    ORDER BY notification_time DESC LIMIT 1""".format(NOTIFICATION_NAME)
+
+        params = (alert_definition_id, self.__id)
+
+        print("query", query)
+        cursor = my_sql.generate_cursor()
+        import pdb;pdb.set_trace()
+        cursor.execute(operation=query, params=params)
+        results = cursor.fetchall()
+
+
+        last_time = datetime.today()
+        self.__previous_notification_datetime = utils.get_datetime_from_iso_str(last_time)
 
     # -- IS Notification ALLOWED --
 
-    def is_notification_allowed(self, datetime_to_check: datetime):
+    def is_notification_allowed(self, datetime_to_check: datetime, alert_definition_id: int):
+        self.set_last_notification_time(alert_definition_id=alert_definition_id)
         return self._enough_time_between_notifications(datetime_to_check=datetime_to_check) \
                and self.is_notification_allowed_for_datetime(datetime_to_check=datetime_to_check)
 
@@ -995,7 +1015,7 @@ class AlertDefinition:
     __name: str
     __id: int
     __description: str
-    __category_id: str
+    __category: str
     __meter_ids: array
     __level: Level
     __flag: int
@@ -1008,7 +1028,7 @@ class AlertDefinition:
         self.__name = setup["name"]
         self.__id = setup["id"]
         self.__description = setup["description"]
-        self.__category_id = setup["category_id"]
+        self.__category = setup["category"]
         self.__level = Level[setup["level"]]
         self.__status = AlertDefinitionStatus[setup["status"]]
         self.__meter_ids = setup["meter_ids"]
@@ -1096,7 +1116,7 @@ class AlertDefinition:
 
     @property
     def category_id(self):
-        return self.__category_id
+        return self.__category
 
     @property
     def id(self):
