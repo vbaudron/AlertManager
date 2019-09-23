@@ -232,7 +232,7 @@ class TableToGenerate:
         query = self.__generate_alert_table_creation_query()
         print(query)
         my_sql.execute_and_close(query=query)
-        TableToGenerate.check_if_table_created(table_name=self.__table_name)
+        return TableToGenerate.check_if_table_created(table_name=self.__table_name)
 
 
     def __str__(self):
@@ -306,6 +306,7 @@ DEFINITION_COMPO = {
     "id": "INT AUTO_INCREMENT PRIMARY KEY",
     "name": "VARCHAR(255)",
     "category": "VARCHAR(255)",
+    "description": "VARCHAR(255)",
     "level": "INT",
     "status": "TINYINT NOT NULL DEFAULT 0",
     "notification_id": "INT NOT NULL",
