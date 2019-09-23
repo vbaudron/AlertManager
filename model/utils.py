@@ -267,6 +267,7 @@ class TableToGenerate:
 
 METER_TABLE_NAME = "bi_compteurs"
 
+
 # ---- #     Notification DEFINITION    # ---- #
 
 NOTIFICATION_NAME = "alert_notification"
@@ -293,6 +294,8 @@ CALCULATOR_COMPO = {
     "value_number": "DOUBLE",
     "value_period_quantity": "INT",
     "value_period_unit": "VARCHAR(8)",
+    "hour_start": "TINYINT SIGNED",
+    "hour_end": "TINYINT SIGNED",
     "acceptable_diff": "BOOLEAN DEFAULT 0"
 }
 
