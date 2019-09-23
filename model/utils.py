@@ -276,8 +276,8 @@ NOTIFICATION_COMPO = {
     "period_unit": "VARCHAR(8)",
     "period_quantity": "INT",
     "email": "VARCHAR(255)",
-    "days_flag": "INT DEFAULT 0",
-    "hours_flag": "INT DEFAULT 0"
+    "days_flag": "INT NOT NULL DEFAULT 0",
+    "hours_flag": "INT NOT NULL DEFAULT 0"
 }
 
 # ---- #     CALCULATOR DEFINITION    # ---- #
@@ -290,12 +290,13 @@ CALCULATOR_COMPO = {
     "data_period_type": "VARCHAR(16) NOT NULL",
     "data_period_quantity": "INT",
     "data_period_unit": "VARCHAR(8)",
-    "value_type": "VARCHAR(32)",
-    "value_number": "DOUBLE",
-    "value_period_quantity": "INT",
-    "value_period_unit": "VARCHAR(8)",
-    "hour_start": "TINYINT SIGNED",
-    "hour_end": "TINYINT SIGNED",
+    "value_type": "VARCHAR(32) NOT NULL",
+    "value_number": "DOUBLE NOT NULL",
+    "value_period_end_date": "DATETIME DEFAULT NULL",
+    "value_period_quantity": "INT DEFAULT NULL",
+    "value_period_unit": "VARCHAR(8) DEFAULT NULL",
+    "hour_start": "TINYINT SIGNED DEFAULT NULL",
+    "hour_end": "TINYINT SIGNED DEFAULT NULL",
     "acceptable_diff": "BOOLEAN DEFAULT 0"
 }
 
@@ -304,11 +305,11 @@ CALCULATOR_COMPO = {
 DEFINITION_TABLE_NAME = "alert_definition"
 DEFINITION_COMPO = {
     "id": "INT AUTO_INCREMENT PRIMARY KEY",
-    "name": "VARCHAR(255)",
-    "category": "VARCHAR(255)",
-    "description": "VARCHAR(255)",
-    "level": "INT",
-    "status": "TINYINT NOT NULL DEFAULT 0",
+    "name": "VARCHAR(255) DEFAULT NULL",
+    "category": "VARCHAR(255) DEFAULT NULL",
+    "description": "VARCHAR(255) DEFAULT NULL",
+    "level": "INT NOT NULL",
+    "status": "TINYINT NOT NULL",
     "notification_id": "INT NOT NULL",
     "calculator_id": "INT NOT NULL"
 }
@@ -322,8 +323,8 @@ DEFINITON_ALERT_FOREIGN_KEY = [
 METER_DEFINITIONS_ALERT_TABLE_NAME = "alert_definition_meter"
 
 METER_DEFINITION_COMPO = {
-    "meter_id": "INT",
-    "alert_definition_id": "INT"
+    "meter_id": "INT NOT NULL",
+    "alert_definition_id": "INT NOT NULL"
 }
 METER_DEFINITION_ALERT_FOREIGN_KEY = [
     "FOREIGN KEY (meter_id) REFERENCES {}(id)".format(METER_TABLE_NAME),
@@ -338,9 +339,9 @@ ALERT_TABLE_COMPO = {
     "id": "INT AUTO_INCREMENT PRIMARY KEY",
     "creation_date": "DATETIME NOT NULL",
     "modification_date": "DATETIME NOT NULL",
-    "data": "DOUBLE",
-    "value": "DOUBLE",
-    "status": "TINYINT",
+    "data": "DOUBLE NOT NULL",
+    "value": "DOUBLE NOT NULL",
+    "status": "TINYINT NOT NULL",
     "alert_definition_id": "INT NOT NULL",
     "meter_id": "INT NOT NULL"
 }
