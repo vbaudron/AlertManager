@@ -132,15 +132,16 @@ class PeriodUnitDefinition(Enum):
        value : represent the String associated to the period - it is the KEY in json file
        go_past : it is the method associated to calculate the start date from the end_date
    """
-    DAY = "DAY", go_past_with_days
-    WEEK = "WEEK", go_past_with_weeks
-    MONTH = "MONTH", go_past_with_months
-    YEAR = "YEAR", go_past_with_years
+    DAY = "DAY", go_past_with_days, 24
+    WEEK = "WEEK", go_past_with_weeks, (7 * 24)
+    MONTH = "MONTH", go_past_with_months, (30 * 24)
+    YEAR = "YEAR", go_past_with_years, (365 * 24)
 
-    def __new__(cls, str_name, method):
+    def __new__(cls, str_name, method, nb_hour):
         obj = object.__new__(cls)
         obj._value_ = str_name
         obj.go_past = method
+        obj.nb_hour = nb_hour
         return obj
 
 
@@ -275,7 +276,16 @@ class SimpleDBBasedValueGenerator(DataBaseValueGenerator, ValueGenerator):  # GO
         super().__init__()
 
     def get_value_in_db(self, meter_id: int):
-        return 0  # TODO
+        query = """SELECT o.value, o.time_unit from bi_objectifs o where o.r_compteur=%s"""
+        params = [meter_id]
+        cursor = my_sql.generate_cursor()
+        cursor.execute(operation=query, params=params)
+        result = cursor.fetchall()
+        value, time_unit = result[0]
+        if time_unit:
+            period_unit = PeriodUnitDefinition(time_unit)
+            value = value / period_unit.nb_hour
+        return value
 
 
 class PeriodBasedValueGenerator(DataBaseValueGenerator, ValueGenerator):
@@ -369,6 +379,8 @@ class AlertValue:
 class AlertData:
     # setup
     __setup: dict
+    __hour_start: int
+    __hour_end: int
 
     # data
     __data_period_type: PeriodGeneratorType
@@ -384,15 +396,22 @@ class AlertData:
     def set_period_generator(self, last_check: datetime, today: datetime) -> None:
         # Set Factory
         if self.data_period_type is PeriodGeneratorType.LAST_CHECK:
-            self.__data_period_generator = LastCheckBasedPeriodGenerator(last_check=last_check,
-                                                                         today=today)
+            self.__data_period_generator = LastCheckBasedPeriodGenerator(
+                last_check=last_check,
+                today=today
+            )
         elif self.data_period_type is PeriodGeneratorType.USER_BASED:
             self.__data_period_generator = UserBasedPeriodGenerator(user_data=self.setup["data_period"],
                                                                     today=today)
 
     def get_all_data_in_db(self, meter_id: int, is_index: bool) -> "list: all data from db":
         period = self.__data_period_generator.get_pertinent_period()
-        all_data = HandleDataFromDB(period=period).get_data_from_db(meter_id=meter_id, is_index=is_index)
+        all_data = HandleDataFromDB(period=period).get_data_from_db(
+            meter_id=meter_id,
+            is_index=is_index,
+            hour_start=self.__hour_start,
+            hour_end=self.__hour_end,
+        )
         print("all data ", all_data)
         return all_data
 
@@ -429,8 +448,9 @@ class HandleDataFromDB:
 
     @staticmethod
     def generate_query() -> str:
-        query = "SELECT {} FROM {} WHERE {} = %s AND {} BETWEEN %s AND %s".format(
+        query = "SELECT {}, {} FROM {} WHERE {} = %s AND {} BETWEEN %s AND %s".format(
             HandleDataFromDB.value_column_name,
+            HandleDataFromDB.hour_column_name,
             HandleDataFromDB.table_name,
             HandleDataFromDB.meter_id_column_name,
             HandleDataFromDB.hour_column_name
@@ -451,8 +471,8 @@ class HandleDataFromDB:
 
         result = list()
         for row in iter_row(my_cursor, 10):
-            result.append(row[0])
-
+            result.append([row[0], row[1]])
+        print("Result query :", result)
         return result
 
     def __aggregate_result(self, result):
@@ -463,11 +483,22 @@ class HandleDataFromDB:
             i += 1
         return agg
 
-    def get_data_from_db(self, meter_id: int, is_index: bool):
-        result = self.__get_query_result(meter_id=meter_id)
+    def is_between_hour(self, time: datetime, hour_start: int, hour_end: int):
+        hour = time.hour
+        if hour_start < hour_end:
+            return hour_start <= hour < hour_end
+        if hour >= hour_end:
+            return hour >= hour_start
+        return True
+
+    def get_data_from_db(self, meter_id: int, is_index: bool, hour_start: int=None, hour_end: int=None,):
+        results = self.__get_query_result(meter_id=meter_id)
+        print(len(results))
+        if hour_start and hour_end and hour_end != hour_start:
+            results = [result for result in results if self.is_between_hour(result[1], hour_start=hour_start, hour_end=hour_end)]
         if is_index:
-            result = self.__aggregate_result(result=result)
-        return result
+            results = self.__aggregate_result(result=results)
+        return results
 
 
 # ------------------   [ FACTORY Class ]   ---------------------
