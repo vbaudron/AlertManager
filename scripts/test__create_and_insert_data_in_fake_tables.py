@@ -9,6 +9,41 @@ from model.utils import my_sql, METER_TABLE_NAME, TableToGenerate, NOTIFICATION_
 from scripts.alert_tables_creation import create_tables
 
 
+# _____________________________________  ****   INSERT METHODS   ****  _______________________________________________
+
+def insert_query_construction(compo, name):
+    # PARAMS
+    params_list = list(key for key in compo.keys())
+    params_list.pop(0)
+    params_str = ", ".join([param for param in params_list])
+
+    # Format
+    format_param = ", ".join(["%s" for param in params_list])
+
+    # QUERY
+    query = "INSERT INTO {} ({}) VALUES ({})".format(name, params_str, format_param)
+    print(query)
+    return query
+
+
+def insert_query_construction_without_id(compo, name):
+    # PARAMS
+    params_list = list(key for key in compo.keys())
+    params_str = ", ".join([param for param in params_list])
+
+    # Format
+    format_param = ", ".join(["%s" for param in params_list])
+
+    # QUERY
+    query = "INSERT INTO {} ({}) VALUES ({})".format(name, params_str, format_param)
+    print(query)
+    return query
+
+
+# _____________________________________  ****   NON ALERT (FAKE) TABLES   ****  _______________________________________________
+
+# ____________ BI_COMPTAGE_DONNEES
+
 def __generate_valeur_comptage_table_query():
     my_format = "CREATE TABLE IF NOT EXISTS {} ( ".format(HandleDataFromDB.table_name)
     my_format += "id INT AUTO_INCREMENT PRIMARY KEY, "
@@ -36,6 +71,7 @@ def get_insert_base_BI_COMPTAGE_DONNEE_table():
         HandleDataFromDB.meter_id_column_name,
         HandleDataFromDB.hour_column_name
     )
+
 
 def insert_random_data_in_BI_COMPTAGE_DONNEE_table():
     insert_base = get_insert_base_BI_COMPTAGE_DONNEE_table()
@@ -91,8 +127,9 @@ def insert_data_to_test_in_BI_COMPTAGE_DONNEE_table():
         my_sql.execute_and_close(query=insert_base, params=value)
 
 
-# --------------------------------------------    BI_COMPTEURS
-INDEX_COLUMN_NAME = "IS_INDEX"
+# ____________ BI_COMPTEURS
+INDEX_COLUMN_NAME = "is_index"
+
 
 def __generate_table_COMPTEUR_query():
     my_format = "CREATE TABLE IF NOT EXISTS {} (".format(METER_TABLE_NAME)
@@ -107,7 +144,6 @@ def create_BI_COMPTEUR_table():
     print(query)
     my_sql.execute_and_close(query=query)
     return TableToGenerate.check_if_table_created(table_name=METER_TABLE_NAME)
-
 
 
 def insert_data_in_BI_COMPTEUR_table():
@@ -139,42 +175,45 @@ def insert_data_in_BI_COMPTEUR_table():
         my_sql.execute_and_close(query=select_base, params=value)
 
 
+#  ____________ BI_OBJECTIF
+
+OBJECTIF_TABLE_NAME = "bi_objectifs"
+OBJECTIF_TABLE_COMPO = {
+    "id": "INT AUTO_INCREMENT PRIMARY KEY",
+    "value": "DOUBLE",
+    "time_unit" : "VARCHAR(8) DEFAULT NULL",
+    "r_compteur": "INT"
+}
+OBJECTIF_TABLE_FOREIGN_KEY = [
+    "FOREIGN KEY (r_compteur) REFERENCES {}(id)".format(METER_TABLE_NAME)
+]
+
+def create_bi_objectif_table():
+    bi_objectif_table = TableToGenerate(
+        table_name=OBJECTIF_TABLE_NAME,
+        compo=OBJECTIF_TABLE_COMPO,
+        foreign_keys=OBJECTIF_TABLE_FOREIGN_KEY
+    )
+    return bi_objectif_table.request_table_creation()
 
 
-def query_construction(compo, name):
-    # PARAMS
-    params_list = list(key for key in compo.keys())
-    params_list.pop(0)
-    params_str = ", ".join([param for param in params_list])
-
-    # Format
-    format_param = ", ".join(["%s" for param in params_list])
-
-    # QUERY
-    query = "INSERT INTO {} ({}) VALUES ({})".format(name, params_str, format_param)
-    print(query)
-    return query
-
-
-def query_construction_without_id(compo, name):
-    # PARAMS
-    params_list = list(key for key in compo.keys())
-    params_str = ", ".join([param for param in params_list])
-
-    # Format
-    format_param = ", ".join(["%s" for param in params_list])
-
-    # QUERY
-    query = "INSERT INTO {} ({}) VALUES ({})".format(name, params_str, format_param)
-    print(query)
-    return query
+def insert_data_in_bi_objectifs():
+    query = insert_query_construction(compo=OBJECTIF_TABLE_COMPO, name=OBJECTIF_TABLE_NAME)
+    params = [
+        2.456,
+        PeriodUnitDefinition.DAY.name,
+        1
+    ]
+    print("params", params)
+    my_sql.execute_and_close(query=query, params=params)
 
 
 
-# --------------------------------------------    BI_ALERT_DEFINITION
+# _____________________________________  ****   ALERT TABLES INSERTION  ****  __________________________________________
+
 
 def insert_in_notification(period_unit: str, period_quantity: int, email: str, days_flags: int, hours_flags: int):
-    query = query_construction(compo=NOTIFICATION_COMPO, name=NOTIFICATION_NAME)
+    query = insert_query_construction(compo=NOTIFICATION_COMPO, name=NOTIFICATION_NAME)
     params = [
         period_unit,
         period_quantity,
@@ -187,8 +226,8 @@ def insert_in_notification(period_unit: str, period_quantity: int, email: str, d
     my_sql.execute_and_close(query=query, params=params)
 
 
-def insert_in_calculator(operator, comparator, data_period_type, data_period_quantity, data_period_unit, value_type, value_number, value_period_quantity, value_period_unit, acceptable_diff):
-    query = query_construction(compo=CALCULATOR_COMPO, name=CALCULATOR_NAME)
+def insert_in_calculator(operator, comparator, data_period_type, data_period_quantity, data_period_unit, value_type, value_number, value_period_quantity, value_period_unit, hour_start, hour_end, acceptable_diff):
+    query = insert_query_construction(compo=CALCULATOR_COMPO, name=CALCULATOR_NAME)
     params = [
         operator,
         comparator,
@@ -199,6 +238,8 @@ def insert_in_calculator(operator, comparator, data_period_type, data_period_qua
         value_number,
         value_period_quantity,
         value_period_unit,
+        hour_start,
+        hour_end,
         acceptable_diff
     ]
     print("query", query)
@@ -206,11 +247,12 @@ def insert_in_calculator(operator, comparator, data_period_type, data_period_qua
     my_sql.execute_and_close(query=query, params=params)
 
 
-def insert_in_alert_definition(name, category, level, status, notification_id, calculator_id):
-    query = query_construction(compo=DEFINITION_COMPO, name=DEFINITION_TABLE_NAME)
+def insert_in_alert_definition(name, category, description, level, status, notification_id, calculator_id):
+    query = insert_query_construction(compo=DEFINITION_COMPO, name=DEFINITION_TABLE_NAME)
     params = [
         name,
         category,
+        description,
         level,
         status,
         notification_id,
@@ -222,7 +264,7 @@ def insert_in_alert_definition(name, category, level, status, notification_id, c
 
 
 def insert_in_alert_definition_meter(meter_id: int, alert_definition_id: int):
-    query = query_construction_without_id(compo=METER_DEFINITION_COMPO, name=METER_DEFINITIONS_ALERT_TABLE_NAME)
+    query = insert_query_construction_without_id(compo=METER_DEFINITION_COMPO, name=METER_DEFINITIONS_ALERT_TABLE_NAME)
     params = [
         meter_id,
         alert_definition_id
@@ -253,13 +295,16 @@ def create_alert_def_and_other_data():
         value_number=15,
         value_period_quantity=1,
         value_period_unit=PeriodUnitDefinition.WEEK.name,
+        hour_start=20,
+        hour_end=8,
         acceptable_diff=False
     )
 
     # ALERT DEFINITION
     insert_in_alert_definition(
         name="definition_name_1",
-        category="definition_name_1",
+        category="definition_category_1",
+        description="description_1",
         level=Level.HIGH.value,
         status=AlertDefinitionStatus.ACTIVE.value,
         notification_id=1,
@@ -282,6 +327,10 @@ def create_all_fake():
         # BI DONNEE COMPTAGE
         if create_BI_COMPTAGE_DONNEE_table():
             insert_data_to_test_in_BI_COMPTAGE_DONNEE_table()
+
+        # BI OBJECTIFS
+        if create_bi_objectif_table():
+            insert_data_in_bi_objectifs()
 
     if not TableToGenerate.check_if_table_created(table_name=DEFINITION_TABLE_NAME):
         create_tables()
