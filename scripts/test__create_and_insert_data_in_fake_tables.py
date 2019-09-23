@@ -156,6 +156,21 @@ def query_construction(compo, name):
     return query
 
 
+def query_construction_without_id(compo, name):
+    # PARAMS
+    params_list = list(key for key in compo.keys())
+    params_str = ", ".join([param for param in params_list])
+
+    # Format
+    format_param = ", ".join(["%s" for param in params_list])
+
+    # QUERY
+    query = "INSERT INTO {} ({}) VALUES ({})".format(name, params_str, format_param)
+    print(query)
+    return query
+
+
+
 # --------------------------------------------    BI_ALERT_DEFINITION
 
 def insert_in_notification(period_unit: str, period_quantity: int, email: str, days_flags: int, hours_flags: int):
@@ -207,7 +222,7 @@ def insert_in_alert_definition(name, category, level, status, notification_id, c
 
 
 def insert_in_alert_definition_meter(meter_id: int, alert_definition_id: int):
-    query = query_construction(compo=METER_DEFINITION_COMPO, name=METER_DEFINITIONS_ALERT_TABLE_NAME)
+    query = query_construction_without_id(compo=METER_DEFINITION_COMPO, name=METER_DEFINITIONS_ALERT_TABLE_NAME)
     params = [
         meter_id,
         alert_definition_id
@@ -272,9 +287,6 @@ def create_all_fake():
         create_tables()
 
     create_alert_def_and_other_data()
-
-
-
 
 
 if __name__ == '__main__':

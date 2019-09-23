@@ -318,7 +318,6 @@ DEFINITON_ALERT_FOREIGN_KEY = [
 METER_DEFINITIONS_ALERT_TABLE_NAME = "alert_definition_meter"
 
 METER_DEFINITION_COMPO = {
-    "id": "INT AUTO_INCREMENT PRIMARY KEY",
     "meter_id": "INT",
     "alert_definition_id": "INT"
 }
