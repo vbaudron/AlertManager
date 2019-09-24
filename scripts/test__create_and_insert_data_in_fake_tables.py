@@ -1,7 +1,7 @@
 import random
 
 from model.alert import HandleDataFromDB, PeriodUnitDefinition, MyOperator, MyComparator, PeriodGeneratorType, \
-    ValueGeneratorType, Level, AlertStatus, AlertDefinitionStatus, Day, Hour
+    ValueGeneratorType, Level, AlertStatus, AlertDefinitionStatus, Day, Hour, ValuePeriodType
 from datetime import datetime, timedelta
 from model.utils import my_sql, METER_TABLE_NAME, TableToGenerate, NOTIFICATION_COMPO, NOTIFICATION_NAME, \
     CALCULATOR_COMPO, CALCULATOR_NAME, DEFINITION_COMPO, DEFINITION_TABLE_NAME, METER_DEFINITION_COMPO, \
@@ -226,7 +226,7 @@ def insert_in_notification(period_unit: str, period_quantity: int, email: str, d
     my_sql.execute_and_close(query=query, params=params)
 
 
-def insert_in_calculator(operator, comparator, data_period_type, data_period_quantity, data_period_unit, value_type, value_number, value_period_quantity, value_period_unit, hour_start, hour_end, acceptable_diff):
+def insert_in_calculator(operator, comparator, data_period_type, data_period_quantity, data_period_unit, value_type, value_number, value_period_type, hour_start, hour_end, acceptable_diff):
     query = insert_query_construction(compo=CALCULATOR_COMPO, name=CALCULATOR_NAME)
     params = [
         operator,
@@ -236,8 +236,7 @@ def insert_in_calculator(operator, comparator, data_period_type, data_period_qua
         data_period_unit,
         value_type,
         value_number,
-        value_period_quantity,
-        value_period_unit,
+        value_period_type,
         hour_start,
         hour_end,
         acceptable_diff
@@ -293,8 +292,7 @@ def create_alert_def_and_other_data():
         data_period_unit=PeriodUnitDefinition.DAY.name,
         value_type=ValueGeneratorType.PERIOD_BASED_VALUE.name,
         value_number=15,
-        value_period_quantity=1,
-        value_period_unit=PeriodUnitDefinition.WEEK.name,
+        value_period_type=ValuePeriodType.LAST_YEAR.name,
         hour_start=20,
         hour_end=8,
         acceptable_diff=False
@@ -313,7 +311,7 @@ def create_alert_def_and_other_data():
 
     # DEFINITION METER
     insert_in_alert_definition_meter(
-        meter_id=3,
+        meter_id=4,
         alert_definition_id=1
     )
 

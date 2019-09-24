@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 from unittest.mock import patch, MagicMock
 
 from model.alert import AlertDefinition, AlertDefinitionFlag, Level, MyOperator, MyComparator, PeriodUnitDefinition, \
-    PeriodDefinition, AlertCalculator, LastCheckBasedPeriodGenerator, PeriodGenerator, Period, UserBasedPeriodGenerator, \
+    PeriodDefinition, AlertCalculator, LastCheckBasedPeriodGenerator, PeriodGenerator, Period, UserBasedGoBackPeriodGenerator, \
     UserBasedValueGenerator, ValueGenerator, PeriodBasedValueGenerator, DataBaseValueGenerator, PeriodGeneratorType, \
     ValueGeneratorType, NoPeriodBasedValueGenerator, SimpleDBBasedValueGenerator, AlertData, AlertValue, \
     AlertNotification, NotificationPeriod, Day, Hour, AlertManager
@@ -909,9 +909,9 @@ class PeriodGeneratorTest(unittest.TestCase):
             "unit": PeriodUnitDefinition.DAY.value
         }
         expected_start = datetime(year=2019, month=8, day=8)
-        user_based_period_generator = UserBasedPeriodGenerator(user_data=user_data, today=self.today)
+        user_based_period_generator = UserBasedGoBackPeriodGenerator(user_data=user_data, to_date=self.today)
 
-        self.assertIsInstance(user_based_period_generator, UserBasedPeriodGenerator)
+        self.assertIsInstance(user_based_period_generator, UserBasedGoBackPeriodGenerator)
         self.assertIsInstance(user_based_period_generator, PeriodGenerator)
 
         result_period = user_based_period_generator.get_pertinent_period()
@@ -1031,7 +1031,7 @@ class AlertDatatest(unittest.TestCase):
         self.data_period_type = PeriodGeneratorType.USER_BASED
 
         alert_data = self.update_and_get_new_alert_data()
-        self.assertIsInstance(alert_data.data_period_generator, UserBasedPeriodGenerator)
+        self.assertIsInstance(alert_data.data_period_generator, UserBasedGoBackPeriodGenerator)
 
         # Pertinent parameters
         with patch("model.alert.UserBasedPeriodGenerator") as mock:

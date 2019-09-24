@@ -1,3 +1,4 @@
+from abc import ABC
 from enum import Enum
 from model.utils import enum_str_values
 
@@ -7,7 +8,7 @@ class EnumError(Exception):
     __wrong_value: str
     __except_enum: Enum
 
-    def __init__(self, except_enum: Enum, wrong_value: object) -> object:
+    def __init__(self, except_enum: Enum, wrong_value: object):
         self.__wrong_value = str(wrong_value)
         self.__except_enum = except_enum
 
@@ -38,6 +39,8 @@ class ConfigError(Exception):
         self.__message = msg
         self.__obj = obj
 
+        print(self.__class__.__name__ + " has been created for : " + self.__obj + " with message : " + self.message)
+
     def __str__(self):
         return "ConfigError from {} : {}".format(self.obj.__class__.__name__, self.message)
 
@@ -48,3 +51,23 @@ class ConfigError(Exception):
     @property
     def obj(self):
         return self.__obj
+
+
+class StopCheckAlertDefinition(ABC, Exception):
+    _message: str
+
+    def __init__(self, obj):
+        self._obj = obj
+
+    def __str__(self):
+        return "Alert Definition Check has been STOPPED by Exception '{}' : {}".format(
+            self._obj.__class__.__name__,
+            self._message
+        )
+
+
+class NoDataFoundInDatabase(StopCheckAlertDefinition):
+
+    def __init__(self, message):
+        super().__init__(self)
+        self._message = message

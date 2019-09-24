@@ -2,7 +2,7 @@ from model.utils import TableToGenerate, ALERT_TABLE_NAME, ALERT_FOREIGN_KEY, AL
     NOTIFICATION_COMPO, DEFINITION_TABLE_NAME, DEFINITON_ALERT_FOREIGN_KEY, DEFINITION_COMPO, CALCULATOR_NAME, \
     CALCULATOR_COMPO, METER_DEFINITIONS_ALERT_TABLE_NAME, METER_DEFINITION_COMPO, \
     METER_DEFINITION_ALERT_FOREIGN_KEY, ALERT_DEFINITION_NOTIFICATION_TIME, ALERT_DEFINITION_NOTIFICATION_TIME_COMPO, \
-    ALERT_DEFINITION_NOTIFICATION_TIME_FOREIGN_KEY
+    ALERT_DEFINITION_NOTIFICATION_TIME_FOREIGN_KEY, ALERT_MANAGER_TABLE_NAME, ALERT_MANAGER_TABLE_COMPO
 
 # NOTIFICATION
 notification_table = TableToGenerate(
@@ -49,6 +49,11 @@ definition_notification_table = TableToGenerate(
     foreign_keys=ALERT_DEFINITION_NOTIFICATION_TIME_FOREIGN_KEY
 )
 
+manager_table = TableToGenerate(
+    table_name=ALERT_MANAGER_TABLE_NAME,
+    compo=ALERT_MANAGER_TABLE_COMPO
+)
+
 
 # CREATE TABLES
 def create_tables():
@@ -58,7 +63,8 @@ def create_tables():
         definition_table,
         alert_table,
         definition_meter_table,
-        definition_notification_table
+        definition_notification_table,
+        manager_table
     ]
 
     for table in tables:

@@ -11,14 +11,15 @@ import calendar
 from datetime import datetime, timedelta
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
+from typing import Any, Union
 
 from mysql.connector.cursor import MySQLCursor
 
 from model import utils
-from model.my_exception import EnumError, ConfigError
+from model.my_exception import EnumError, ConfigError, NoDataFoundInDatabase, StopCheckAlertDefinition
 from model.utils import get_day_name_from_datetime, get_data_from_json_file, get_str_from_file, \
     get_path_in_data_folder_of, my_sql, ALERT_TABLE_NAME, ALERT_TABLE_COMPO, \
-    SOURCE_PATH, iter_row, METER_TABLE_NAME, NOTIFICATION_NAME
+    SOURCE_PATH, iter_row, METER_TABLE_NAME, NOTIFICATION_NAME, ALERT_MANAGER_TABLE_NAME
 from enum import Enum, auto, unique, Flag, IntEnum
 
 
@@ -182,6 +183,9 @@ class Period:
     def get_end_date(self):
         return self.__end_date
 
+    def __str__(self):
+        return "[PERIOD] from {} to {}".format(self.__start_date.isoformat(), self.__end_date.isoformat())
+
 
 # ---------------------------------------------------   CALCULATOR   ------------------------------------------------------
 
@@ -210,21 +214,22 @@ class LastCheckBasedPeriodGenerator(PeriodGenerator):
         self._period = Period(start=last_check, end=today)
 
 
-class UserBasedPeriodGenerator(PeriodGenerator):
+class UserBasedGoBackPeriodGenerator(PeriodGenerator):
     __period_definition: PeriodDefinition
 
-    def __init__(self, today: datetime, user_data: dict) -> None:
+    def __init__(self, to_date: datetime, unit, quantity: int) -> None:
         super().__init__()
-        self.generate_period_definition(unit=user_data["unit"], quantity=user_data["quantity"])
-        self.generate_period(today=today)
+        self.__generate_period_definition(unit=unit, quantity=quantity)
+        self.__generate_period(to_date=to_date)
 
-    def generate_period_definition(self, unit: str, quantity: int):
-        period_unit = PeriodUnitDefinition(unit)
-        self.__period_definition = PeriodDefinition(unit=period_unit, quantity=quantity)
+    def __generate_period_definition(self, unit, quantity: int):
+        if not isinstance(unit, PeriodUnitDefinition):
+            unit = PeriodUnitDefinition(unit)
+        self.__period_definition = PeriodDefinition(unit=unit, quantity=quantity)
 
-    def generate_period(self, today: datetime):
-        start_date = self.__period_definition.get_start_date_from_end_date(end_date=today)
-        self._period = Period(start=start_date, end=today)
+    def __generate_period(self, to_date: datetime):
+        start_date = self.__period_definition.get_start_date_from_end_date(end_date=to_date)
+        self._period = Period(start=start_date, end=to_date)
 
 
 # -------------- [ VALUE GENERATOR ] --------------
@@ -236,6 +241,10 @@ class ValueGeneratorType(Enum):
     SIMPLE_DB_BASED_VALUE = auto()
     PERIOD_BASED_VALUE = auto()
 
+@unique
+class ValuePeriodType(Enum):
+    LAST_YEAR = auto()
+    LAST_DATA_PERIOD = auto()
 
 # -- class
 class ValueGenerator(ABC):
@@ -293,26 +302,30 @@ class PeriodBasedValueGenerator(DataBaseValueGenerator, ValueGenerator):
     __period: Period
     __operator: MyOperator
 
-    def __init__(self, operator: MyOperator, user_data: dict, today: datetime) -> None:
+    def __init__(self, operator: MyOperator, unit: str, quantity: int, today: datetime) -> None:
         super().__init__()
-        self.generate_period(user_data=user_data, today=today)
+        self.generate_period(quantity=quantity, unit=unit, today=today)
         self.__operator = operator
 
-    def generate_period(self, user_data: dict, today: datetime):
-        period_generator = UserBasedPeriodGenerator(user_data=user_data, today=today)
+    def generate_period(self, unit: str, quantity: int, today: datetime):
+        period_generator = UserBasedGoBackPeriodGenerator(quantity=quantity, unit=unit, to_date=today)
         self.__period = period_generator.get_pertinent_period()
 
     def get_value_in_db(self, meter_id: int, is_index: bool):
         hdl = HandleDataFromDB(period=self.__period)
         result = hdl.get_data_from_db(meter_id=meter_id, is_index=is_index)
-        return self.__operator.calculate(result)
+        if result:
+            return self.__operator.calculate(result)
+        else:
+            raise NoDataFoundInDatabase(message="no value found for {}".format(self.__period))
+
 
 
 class NoPeriodBasedValueGenerator(ValueGenerator):
     def calculate_value(self, meter_id: int):
         pass
 
-    def __init__(self, value: int) -> None:
+    def __init__(self, value: float) -> None:
         super().__init__()
         self._value = value
 
@@ -320,31 +333,26 @@ class NoPeriodBasedValueGenerator(ValueGenerator):
 # ------------------  [ AlertValue Class ] ---------------------
 
 class AlertValue:
-    # setup
-    __setup: dict
     # value
     __value_generator_type: ValueGeneratorType
     __value_generator: ValueGenerator
     __value_number: int
     __value: float  # value to compare with
 
-    def __init__(self, setup: dict, today: datetime, operator: MyOperator):
-        self.__setup = setup
-        self.__value_generator_type = ValueGeneratorType[self.setup["value_type"]]
-        self.__value_number = self.setup["value_number"]
+    def __init__(self, value_type: str, value_number: float):
+        self.__value_generator_type = ValueGeneratorType[value_type]
+        self.__value_number = value_number
 
-        # Set Factory
-        self.set_value_generator(today=today, operator=operator)
-
-    def set_value_generator(self, today: datetime, operator: MyOperator):
+    def set_value_generator(self, end_date: datetime, unit: str, quantity: int, operator: MyOperator):
 
         if self.value_generator_type is ValueGeneratorType.USER_BASED_VALUE:
             self.__value_generator = NoPeriodBasedValueGenerator(value=self.value_number)
         elif self.value_generator_type is ValueGeneratorType.PERIOD_BASED_VALUE:
             self.__value_generator = PeriodBasedValueGenerator(
                 operator=operator,
-                user_data=self.setup["value_period"],
-                today=today
+                unit=unit,
+                quantity=quantity,
+                today=end_date
             )
         elif self.value_generator_type is ValueGeneratorType.SIMPLE_DB_BASED_VALUE:
             self.__value_generator = SimpleDBBasedValueGenerator()
@@ -377,23 +385,36 @@ class AlertValue:
 
 
 class AlertData:
-    # setup
-    __setup: dict
-    __hour_start: int
+    # Filter
     __hour_end: int
+    __hour_start: int
 
     # data
     __data_period_type: PeriodGeneratorType
     __data_period_generator: PeriodGenerator
     __data: float  # data to check - calculated from value in db
 
-    def __init__(self, setup: dict, last_check: datetime, today: datetime):
-        self.__setup = setup
-        self.__data_period_type = PeriodGeneratorType[setup["data_period_type"]]
+    def __init__(self,
+                 data_period_type: str,
+                 data_period_quantity: int,
+                 data_period_unit: str,
+                 hour_start: int,
+                 hour_end,
+                 last_check: datetime,
+                 today: datetime):
+        self.__hour_start = hour_start
+        self.__hour_end = hour_end
 
-        self.set_period_generator(last_check=last_check, today=today)
+        self.__data_period_type = PeriodGeneratorType[data_period_type]
 
-    def set_period_generator(self, last_check: datetime, today: datetime) -> None:
+        self.set_period_generator(
+            last_check=last_check,
+            today=today,
+            data_period_quantity=data_period_quantity,
+            data_period_unit=data_period_unit
+        )
+
+    def set_period_generator(self, last_check: datetime, today: datetime, data_period_quantity: int, data_period_unit: str,) -> None:
         # Set Factory
         if self.data_period_type is PeriodGeneratorType.LAST_CHECK:
             self.__data_period_generator = LastCheckBasedPeriodGenerator(
@@ -401,8 +422,11 @@ class AlertData:
                 today=today
             )
         elif self.data_period_type is PeriodGeneratorType.USER_BASED:
-            self.__data_period_generator = UserBasedPeriodGenerator(user_data=self.setup["data_period"],
-                                                                    today=today)
+            self.__data_period_generator = UserBasedGoBackPeriodGenerator(
+                quantity=data_period_quantity,
+                unit=data_period_unit,
+                to_date=today
+            )
 
     def get_all_data_in_db(self, meter_id: int, is_index: bool) -> "list: all data from db":
         period = self.__data_period_generator.get_pertinent_period()
@@ -412,7 +436,6 @@ class AlertData:
             hour_start=self.__hour_start,
             hour_end=self.__hour_end,
         )
-        print("all data ", all_data)
         return all_data
 
     @property
@@ -447,32 +470,44 @@ class HandleDataFromDB:
         self.__period = period
 
     @staticmethod
-    def generate_query() -> str:
-        query = "SELECT {}, {} FROM {} WHERE {} = %s AND {} BETWEEN %s AND %s".format(
-            HandleDataFromDB.value_column_name,
-            HandleDataFromDB.hour_column_name,
+    def generate_query(time_needed: bool) -> str:
+
+        def get_select():
+            if time_needed:
+                return "{}, {}".format(
+                    HandleDataFromDB.value_column_name, HandleDataFromDB.hour_column_name
+                )
+            return HandleDataFromDB.value_column_name
+
+        query = "SELECT {} FROM {} WHERE {} = %s AND {} BETWEEN %s AND %s".format(
+            get_select(),
             HandleDataFromDB.table_name,
             HandleDataFromDB.meter_id_column_name,
             HandleDataFromDB.hour_column_name
         )
-        print(query)
         return query
 
-    def __get_query_result(self, meter_id: int):
-        my_cursor = my_sql.generate_cursor()
-        my_cursor.execute(
-            operation=HandleDataFromDB.generate_query(),
-            params=(
+    def __get_query_result(self, meter_id: int, time_needed: bool):
+        cursor = my_sql.generate_cursor()
+
+        query = HandleDataFromDB.generate_query(time_needed=time_needed)
+        params = (
                 meter_id,
                 self.__period.get_start_date(),
                 self.__period.get_end_date()
-            )
         )
 
+        print("query :", query)
+        print("params :", params)
+
+        cursor.execute(operation=query, params=params)
+
         result = list()
-        for row in iter_row(my_cursor, 10):
-            result.append([row[0], row[1]])
-        print("Result query :", result)
+        for row in iter_row(cursor, 10):
+            result.append(row[0])
+
+        print("result :", result)
+
         return result
 
     def __aggregate_result(self, result):
@@ -491,11 +526,10 @@ class HandleDataFromDB:
             return hour >= hour_start
         return True
 
-    def get_data_from_db(self, meter_id: int, is_index: bool, hour_start: int=None, hour_end: int=None,):
-        results = self.__get_query_result(meter_id=meter_id)
-        print(len(results))
+    def get_data_from_db(self, meter_id: int, is_index: bool, hour_start: int = None, hour_end: int = None,):
+        results = self.__get_query_result(meter_id=meter_id, time_needed=bool(hour_end and hour_start))
         if hour_start and hour_end and hour_end != hour_start:
-            results = [result for result in results if self.is_between_hour(result[1], hour_start=hour_start, hour_end=hour_end)]
+            results = [result[0] for result in results if self.is_between_hour(result[1], hour_start=hour_start, hour_end=hour_end)]
         if is_index:
             results = self.__aggregate_result(result=results)
         return results
@@ -505,7 +539,6 @@ class HandleDataFromDB:
 
 
 class AlertCalculator:
-    __setup: dict
 
     # datetime
     __last_check: datetime
@@ -524,18 +557,85 @@ class AlertCalculator:
     __alert_value: AlertValue
     __value: float
 
-    def __init__(self, setup: dict, last_check: datetime, today: datetime):
-        self.__setup = setup
+    def __init__(self,
+                 operator: str,
+                 comparator: str,
+                 data_period_type: str,
+                 data_period_quantity: int,
+                 data_period_unit: str,
+                 value_type: str,
+                 value_number: float,
+                 value_period_type: str,
+                 hour_start: int,
+                 hour_end:int,
+                 acceptable_diff: bool,
+                 last_check: datetime,
+                 today: datetime):
 
         self.__last_check = last_check
         self.__today = today
 
-        self.__acceptable_diff = setup["acceptable_diff"]
-        self.__operator = MyOperator(setup["operator"])
-        self.__comparator = MyComparator(setup["comparator"])
+        self.__acceptable_diff = acceptable_diff
+        self.__operator = MyOperator(operator)
+        self.__comparator = MyComparator(comparator)
 
-        self.__alert_data = AlertData(setup=setup["data"], last_check=last_check, today=today)
-        self.__alert_value = AlertValue(setup=setup["value"], today=today, operator=self.operator)
+        # ALERT DATA
+        self.__alert_data = AlertData(
+            data_period_type=data_period_type,
+            data_period_quantity=data_period_quantity,
+            data_period_unit=data_period_unit,
+            hour_start=hour_start,
+            hour_end=hour_end,
+            last_check=last_check,
+            today=today
+        )
+
+        # ALERT VALUE
+        self.__alert_value = AlertValue(
+            value_number=value_number,
+            value_type=value_type
+        )
+
+        self.__handle_alert_value_generator(
+            today=today,
+            value_period_type=value_period_type,
+            data_period_unit=data_period_unit,
+            data_period_quantity=data_period_quantity,
+            operator=self.__operator
+        )
+
+    def __handle_alert_value_generator(self,
+                                       today: datetime,
+                                       value_period_type: str,
+                                       data_period_unit: str,
+                                       data_period_quantity: int,
+                                       operator: MyOperator):
+
+        def get_value_end_date():
+            period_type: ValuePeriodType = ValuePeriodType[value_period_type]
+            if period_type is ValuePeriodType.LAST_YEAR:
+                unit = PeriodUnitDefinition.YEAR
+                quantity = 1
+            elif period_type is ValuePeriodType.LAST_DATA_PERIOD:
+                unit = data_period_unit,
+                quantity = data_period_quantity
+                # Go back data period time
+            tmp_period = UserBasedGoBackPeriodGenerator(
+                to_date=today,
+                unit=unit,
+                quantity=quantity).get_pertinent_period()
+            # Get startDate which will be new end date
+            return tmp_period.get_start_date()
+
+        end_date = get_value_end_date() if value_period_type else today
+
+        self.__alert_value.set_value_generator(
+            end_date=end_date,
+            unit=data_period_unit,
+            quantity=data_period_quantity,
+            operator=operator
+        )
+
 
     def check_non_coherent_config(self):
         if self.acceptable_diff and self.alert_value.value_generator_type is ValueGeneratorType.USER_BASED_VALUE:
@@ -543,6 +643,7 @@ class AlertCalculator:
 
     # -- Find Value that will be Compare with Data --
     def __get_value(self, meter_id: int, is_index: bool):
+        print("\n --- Calculate Value ---")
         self.__alert_value.calculate_value(meter_id=meter_id, is_index=is_index)
         if self.acceptable_diff:
             return self.comparator.get_new_value(
@@ -552,12 +653,16 @@ class AlertCalculator:
         return self.alert_value.value
 
     def is_alert_situation(self, meter_id: int, is_index: bool) -> bool:
+        print("\n --- Calculate Data ---")
         data_from_db = self.alert_data.get_all_data_in_db(meter_id=meter_id, is_index=is_index)
+        print("data from db :", data_from_db)
         if not data_from_db:
             log.warning("no data found in db for meter id {}".format(meter_id))
             return False
         self.__data = self.__operator.calculate(data_from_db)
+        print("____________________  DATA  :", self.__data)
         self.__value = self.__get_value(meter_id=meter_id, is_index=is_index)
+        print("____________________  VALUE :", self.__value)
         return self.comparator.compare(self.data, self.value)
 
     # --- PROPERTIES ---
@@ -699,11 +804,9 @@ class AlertNotification:
 
         print("query", query)
         cursor = my_sql.generate_cursor()
-        import pdb;pdb.set_trace()
         cursor.execute(operation=query, params=params)
         results = cursor.fetchall()
-
-
+        import pdb;pdb.set_trace()
         last_time = datetime.today()
         self.__previous_notification_datetime = utils.get_datetime_from_iso_str(last_time)
 
@@ -753,7 +856,7 @@ class AlertNotification:
             result = self.has_day_in_notification_days(Day[day.upper()])
             return result
         except AttributeError as error:
-            log.warning(error)
+            log.warning("823", error.__str__())
 
     def is_datetime_in_notification_hours(self, datetime_to_check: datetime):
         try:
@@ -761,7 +864,7 @@ class AlertNotification:
             hour = Hour.get_from_int(number=int_hour)
             return self.has_hour_in_notification_hours(hour=hour)
         except AttributeError as error:
-            log.warning(error)
+            log.warning("831", error.__str__())
 
     # -- SET DATA FROM JSON --
 
@@ -781,7 +884,7 @@ class AlertNotification:
                     self.add_day_to_notification_days(enum_day)
         except KeyError:
             error = EnumError(except_enum=Day, wrong_value=day)
-            log.warning(error.__str__())
+            log.warning("851", error.__str__())
 
     def set_notification_hours(self, list_hours: array):
         self.reset_notification_hours()
@@ -792,7 +895,7 @@ class AlertNotification:
                     self.add_notification_hour(hour)
         except KeyError:
             error = EnumError(except_enum=Hour, wrong_value=int_hour)
-            log.warning(error.__str__())
+            log.warning("862", error.__str__())
 
     # -- UTILS --
     # days
@@ -802,14 +905,14 @@ class AlertNotification:
             self.__notification_days |= day.value
         except AttributeError:
             error = EnumError(except_enum=Day, wrong_value=day)
-            log.warning(error.__str__())
+            log.warning("872", error.__str__())
 
     def remove_day_from_notification_days(self, day: Day) -> None:
         try:
             self.__notification_days ^= day.value
         except AttributeError:
             error = EnumError(except_enum=Day, wrong_value=day)
-            log.warning(error.__str__())
+            log.warning("879", error.__str__())
 
     def reset_notification_days(self) -> None:
         self.__notification_days = Day.NONE.value
@@ -819,7 +922,7 @@ class AlertNotification:
             return bool(day.value & self.notification_days)
         except AttributeError:
             error = EnumError(except_enum=Day, wrong_value=day)
-            log.warning(error.__str__())
+            log.warning("889", error.__str__())
             return False
 
     # Hours
@@ -832,14 +935,14 @@ class AlertNotification:
             self.__notification_hours |= hour.value
         except AttributeError:
             error = EnumError(except_enum=Hour, wrong_value=hour)
-            log.warning(error.__str__())
+            log.warning("902", error.__str__())
 
     def has_hour_in_notification_hours(self, hour: Hour) -> bool:
         try:
             return bool(hour.value & self.notification_hours)
         except AttributeError:
             error = EnumError(except_enum=Hour, wrong_value=hour)
-            log.warning(error.__str__())
+            log.warning("909", error.__str__())
             return False
 
     def remove_hour_from_notification_hours(self, hour: Hour) -> None:
@@ -847,7 +950,7 @@ class AlertNotification:
             self.__notification_hours ^= hour.value
         except AttributeError:
             error = EnumError(except_enum=Hour, wrong_value=hour)
-            log.warning(error.__str__())
+            log.warning("917", error.__str__())
 
     @property
     def number(self):
@@ -1049,24 +1152,46 @@ class AlertDefinition:
     __category: str
     __meter_ids: array
     __level: Level
-    __flag: int
     __status: AlertDefinitionStatus
     __last_check: datetime
     __calculator: AlertCalculator
     __notification: AlertNotification
 
-    def __init__(self, setup: dict, today: datetime = datetime.today()):
+    def __init__(self, setup: dict, last_check: datetime, today: datetime = datetime.today()):
         self.__name = setup["name"]
         self.__id = setup["id"]
         self.__description = setup["description"]
         self.__category = setup["category"]
-        self.__level = Level[setup["level"]]
-        self.__status = AlertDefinitionStatus[setup["status"]]
+        self.__level = Level(setup["level"])
+        self.__status = AlertDefinitionStatus(setup["status"])
         self.__meter_ids = setup["meter_ids"]
-        self.set_definition_flags_from_str_flags(flags_list=setup["flags"])
-        self.__last_check = utils.get_datetime_from_iso_str(setup["last_check"])
-        self.__notification = AlertNotification(setup=setup["notification"])
-        self.__calculator = AlertCalculator(setup=setup["calculator"], today=today, last_check=self.last_check)
+
+        # Notification
+        self.__notification = AlertNotification(
+            notification_id=setup["notification_id"],
+            period_unit=setup["notification_period_unit"],
+            period_quantity=setup["notification_period_quantity"],
+            email=setup["notification_email"],
+            days=setup["notification_days"],
+            hours=setup["notification_hours"],
+        )
+
+        # Calculator
+        self.__calculator = AlertCalculator(
+            operator=setup["operator"],
+            comparator=setup["comparator"],
+            data_period_type=setup["data_period_type"],
+            data_period_quantity=setup["data_period_quantity"],
+            data_period_unit=setup["data_period_unit"],
+            value_type=setup["value_type"],
+            value_number=setup["value_number"],
+            value_period_type=setup["value_period_type"],
+            hour_start=setup["hour_start"],
+            hour_end=setup["hour_end"],
+            acceptable_diff=setup["acceptable_diff"],
+            today=today,
+            last_check=last_check
+        )
 
     @property
     def is_active(self) -> bool:
@@ -1081,9 +1206,11 @@ class AlertDefinition:
         :type today datetime
 
         """
+        print("\n______________________________________________________ CHECK AlertDefinition", self.__id)
         results = self.find_is_index(meter_ids=self.meter_ids)
+        print("meters_ids to Handle :", self.__meter_ids)
         for meter_id, is_index in results:
-            print("id = {} is_idx = {}".format(id, is_index))
+            print("\n     ==>  for meter_id : {} is_idx = {}".format(meter_id, is_index))
             if self.calculator.is_alert_situation(meter_id=meter_id, is_index=bool(is_index)):
                 alert = Alert(
                     alert_definition_description=self.description,
@@ -1098,36 +1225,11 @@ class AlertDefinition:
 
     def find_is_index(self, meter_ids):
         format_param = ", ".join(["%s" for m in meter_ids])
-        print(format_param)
         query = "select id, IS_INDEX from {} where id IN ({})".format(METER_TABLE_NAME, format_param)
         print(query)
         my_cursor = my_sql.generate_cursor()
         my_cursor.execute(operation=query, params=meter_ids)
         return my_cursor.fetchall()
-
-
-    # DEFINITION FLAG
-    def has_definition_flag(self, flag: AlertDefinitionFlag):
-        return bool(flag.value & self.__flag)
-
-    def add_definition_flag(self, flag: AlertDefinitionFlag):
-        self.__flag |= flag.value
-
-    def reset_definition_flag(self):
-        self.__flag = AlertDefinitionFlag.NONE.value
-
-    def remove_definition_flag(self, flag: AlertDefinitionFlag):
-        self.__flag ^= flag.value
-
-    def set_definition_flags_from_str_flags(self, flags_list: array):
-        self.reset_definition_flag()
-        for str_flag in flags_list:
-            flag = AlertDefinitionFlag[str_flag]
-            self.add_definition_flag(flag)
-
-    @property
-    def definition_flag(self):
-        return self.__flag
 
     @property
     def name(self):
@@ -1161,11 +1263,6 @@ class AlertDefinition:
     def meter_ids(self):
         return self.__meter_ids
 
-    @property
-    def last_check(self):
-        return self.__last_check
-
-
 # ---------------------------------------------------------------------------------------------------------------------
 
 
@@ -1179,17 +1276,50 @@ class AlertManager:
         data = self.get_alert_def_in_db()
         self.__alert_definition_list = list()
 
+        last_check = self.get_last_check_from_db()
+        print("--> last_check", last_check)
+
+        print("create AlertDefinition Instances")
         for setup in data:
+            print("_____________________________________________________________________________________________")
+            print("AlertDefinition to create from :")
+            for key, value in setup.items():
+                print('\t', key, ':', value)
+
             try:
-                alert_definition = AlertDefinition(setup=setup, today=self.today)
+                alert_definition = AlertDefinition(setup=setup, last_check=last_check, today=self.today)
                 self.__alert_definition_list.append(alert_definition)
             except (KeyError, ConfigError) as error:
-                log.warning(error.__str__())
+                log.warning("1245", error.__str__())
 
-    def start(self):
+    def start_check(self):
+        print("\n\nALERT MANAGER *** START ***")
         for alert_definition in self.alert_definition_list:
-            if alert_definition.is_active:
+            try:
                 alert_definition.check(today=self.today)
+            except StopCheckAlertDefinition as error:
+                log.warning("AlertDefinition " + str(alert_definition.id) + " : " + str(error))
+
+    def save(self):
+        print("\n\nALERT MANAGER *** SAVE ***")
+
+        query = "INSERT INTO {} (launch_time) VALUES (%s)".format(ALERT_MANAGER_TABLE_NAME)
+        params = [self.__today]
+
+        print("query", query)
+        print("params", params)
+
+        my_sql.execute_and_close(query=query, params=params)
+
+    @staticmethod
+    def get_last_check_from_db():
+        query = """SELECT launch_time from {} ORDER BY launch_time DESC LIMIT 1""".format(ALERT_MANAGER_TABLE_NAME)
+        cursor = my_sql.generate_cursor()
+        cursor.execute(operation=query)
+        result = cursor.fetchall()
+        if not result:
+            return datetime.today() - timedelta(days=1)
+        return result[0][0]
 
     @staticmethod
     def get_alert_def_in_db():
@@ -1197,7 +1327,8 @@ class AlertManager:
                 n.period_unit "notification_period_unit", n.period_quantity "notification_period_quantity", 
                 n.email "notification_email", n.days_flag "notification_days", n.hours_flag "notification_hours", 
                 c.operator, c.comparator, c.data_period_type, c.data_period_quantity, c.data_period_unit, 
-                c.value_type, c.value_number, c.value_period_quantity, c.value_period_unit, dm.meter_id 
+                c.value_type, c.value_number, c.value_period_type, c.acceptable_diff, c.hour_start, c.hour_end, 
+                dm.meter_id 
                 from alert_definition d 
                 LEFT JOIN alert_definition_meter dm ON d.id=dm.alert_definition_id 
                 LEFT JOIN alert_notification n ON d.notification_id=n.id 
@@ -1209,6 +1340,12 @@ class AlertManager:
         cursor.execute(operation=query, params=params)
 
         return AlertManager.__handle_result(cursor=cursor)
+
+    @staticmethod
+    def start():
+        alert_manager = AlertManager()
+        alert_manager.start_check()
+        alert_manager.save()
 
     @staticmethod
     def __handle_result(cursor: MySQLCursor):
@@ -1243,8 +1380,5 @@ class AlertManager:
         return self.__today
 
 
-
-def start():
-    alert_manager = AlertManager()
-    alert_manager.start()
-    alert_manager.save()
+def startAlertScript():
+    AlertManager.start()
