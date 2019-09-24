@@ -292,9 +292,7 @@ CALCULATOR_COMPO = {
     "data_period_unit": "VARCHAR(8)",
     "value_type": "VARCHAR(32) NOT NULL",
     "value_number": "DOUBLE NOT NULL",
-    "value_period_end_date": "DATETIME DEFAULT NULL",
-    "value_period_quantity": "INT DEFAULT NULL",
-    "value_period_unit": "VARCHAR(8) DEFAULT NULL",
+    "value_period_type": "VARCHAR(16) DEFAULT NULL",
     "hour_start": "TINYINT SIGNED DEFAULT NULL",
     "hour_end": "TINYINT SIGNED DEFAULT NULL",
     "acceptable_diff": "BOOLEAN DEFAULT 0"
@@ -365,6 +363,16 @@ ALERT_DEFINITION_NOTIFICATION_TIME_FOREIGN_KEY = [
     "FOREIGN KEY (notification_id) REFERENCES {}(id)".format(NOTIFICATION_NAME),
     "FOREIGN KEY (alert_definition_id) REFERENCES {}(id)".format(DEFINITION_TABLE_NAME)
 ]
+
+
+# ---- #     Alert Manager      # ---- #
+
+ALERT_MANAGER_TABLE_NAME = "alert_manager"
+
+ALERT_MANAGER_TABLE_COMPO = {
+    "id": "INT AUTO_INCREMENT PRIMARY KEY",
+    "launch_time": "DATETIME NOT NULL"
+}
 
 # ______________________________________________________________________________________________________________________
 
