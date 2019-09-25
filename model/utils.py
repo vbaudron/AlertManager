@@ -356,7 +356,7 @@ ALERT_DEFINITION_NOTIFICATION_TIME_COMPO = {
     "id": "INT AUTO_INCREMENT PRIMARY KEY",
     "notification_id": "INT NOT NULL",
     "alert_definition_id": "INT NOT NULL",
-    "notification_time": "DATETIME NOT NULL"
+    "notification_datetime": "DATETIME NOT NULL"
 }
 
 ALERT_DEFINITION_NOTIFICATION_TIME_FOREIGN_KEY = [
@@ -371,7 +371,7 @@ ALERT_MANAGER_TABLE_NAME = "alert_manager"
 
 ALERT_MANAGER_TABLE_COMPO = {
     "id": "INT AUTO_INCREMENT PRIMARY KEY",
-    "launch_time": "DATETIME NOT NULL"
+    "launch_datetime": "DATETIME NOT NULL"
 }
 
 # ______________________________________________________________________________________________________________________
