@@ -1,0 +1,191 @@
+<!-- Emails use the XHTML Strict doctype -->
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+    <!-- The character set should be utf-8 -->
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+    <meta name="viewport" content="width=device-width"/>
+    <!-- Link to the email's CSS, which will be inlined into the email -->
+    <link rel="stylesheet" href="../css/foundation-emails.css">
+    <script src="https://kit.fontawesome.com/e7cc1e280d.js" crossorigin="anonymous"></script>
+    <style></style>
+</head>
+
+<body>
+<!-- Wrapper for the body of the email -->
+<table class="body" data-made-with-foundation>
+    <tr>
+        <!-- The class, align, and <center> tag center the container -->
+        <td class="float-center" align="center" valign="top">
+            <center>
+                <!-- CONTENT of EMAIL -->
+                <table align="center" class="container">
+                    <tbody>
+                    <tr>
+                        <td>
+                            <!-- ROW ICON -->
+                            <table class="row" align="center">
+                                <tbody>
+                                <tr>
+
+                                    <!-- COLUMN with CONTENT-->
+                                    <th class="columns first last" align="center">
+                                        <table>
+                                            <tr>
+                                                <th>
+                                                    <center>
+                                                        <i class="fas fa-exclamation-circle fa-2x" style="color: #ec5840;"></i>
+                                                    </center>
+                                                </th>
+                                                <th class="expander"></th>
+                                            </tr>
+                                        </table>
+                                    </th>
+
+                                </tr>
+                                </tbody>
+                            </table>
+                            <!-- end ... ROW ICON -->
+                            <!-- ROW  BOX-->
+                            <table class="row" align="center">
+                                <tbody>
+                                <tr>
+
+                                    <!-- COLUMN with CONTENT-->
+                                    <th class="columns first last">
+                                        <table>
+                                            <tr>
+                                                <th>
+                                                    <!-- ROW for Title -->
+                                                    <table class="row" align="center">
+                                                        <tbody>
+                                                        <tr>
+
+                                                            <!-- COLUMN with CONTENT-->
+                                                            <th class="columns first last">
+                                                                <table>
+                                                                    <tr>
+                                                                        <th>
+                                                                            <h1 class="text-center">{{email_title}}</h1>
+                                                                        </th>
+                                                                        <th class="expander"></th>
+                                                                    </tr>
+                                                                </table>
+                                                            </th>
+
+                                                        </tr>
+                                                        </tbody>
+                                                    </table>
+                                                    <!-- end ... ROW for Title -->
+                                                    <!-- ROW for Message Txt -->
+                                                    <table class="row" align="center">
+                                                        <tbody>
+                                                        <tr>
+
+                                                            <!-- COLUMN with CONTENT-->
+                                                            <th class="columns first last">
+                                                                <table>
+                                                                    <tr>
+                                                                        <th>
+                                                                            {{message_txt}}
+                                                                        </th>
+                                                                        <th class="expander"></th>
+                                                                    </tr>
+                                                                </table>
+                                                            </th>
+
+                                                        </tr>
+                                                        </tbody>
+                                                    </table>
+                                                    <!-- end ... ROW for Message Txt -->
+
+                                                    <!-- SPACER -->
+                                                    <table class="spacer">
+                                                        <tbody>
+                                                        <tr>
+                                                            <td height="16px">&nbsp;</td>
+                                                        </tr>
+                                                        </tbody>
+                                                    </table>
+
+
+                                                    <!-- ROW for Details -->
+                                                    <table class="row" align="center">
+                                                        <tbody>
+                                                        <tr>
+
+                                                            <!-- COLUMN with CONTENT-->
+                                                            <th class="columns first last">
+                                                                <table>
+                                                                    <tr>
+                                                                        <th>
+                                                                            <center>
+                                                                                <table class="button radius alert">
+                                                                                    <tr>
+                                                                                        <td>
+                                                                                            <table>
+                                                                                                <tr>
+                                                                                                    <td>
+                                                                                                        <a href="#">See
+                                                                                                            Alert
+                                                                                                            Details</a>
+                                                                                                    </td>
+                                                                                                </tr>
+                                                                                            </table>
+                                                                                        </td>
+                                                                                    </tr>
+                                                                                </table>
+                                                                            </center>
+                                                                        </th>
+                                                                        <th class="expander"></th>
+                                                                    </tr>
+                                                                </table>
+                                                            </th>
+
+                                                        </tr>
+                                                        </tbody>
+                                                    </table>
+                                                    <!-- end ... ROW for Details -->
+
+
+                                                </th>
+                                                <th class="expander"></th>
+                                            </tr>
+                                        </table>
+                                    </th> <!-- end COLUMN -->
+
+                                </tr>
+                                </tbody>
+                            </table>
+                            <!-- end ... ROW BOX -->
+                            <!-- ROW  CONTACT -->
+                            <table class="row" align="center">
+                                <tbody>
+                                <tr>
+                                    <!-- COLUMN with CONTENT-->
+                                    <th class="columns first last">
+                                        <table>
+                                            <tr>
+                                                <th>
+                                                    <p>{{contact_us_txt}} <a href="#"> Contact us</a> </p></th>
+                                                <th class="expander"></th>
+                                            </tr>
+                                        </table>
+                                    </th>
+                                </tr>
+                                </tbody>
+                            </table>
+                            <!-- end ... ROW CONTACT -->
+
+
+                        </td>
+                    </tr>
+                    </tbody>
+                </table>
+                <!-- end ... CONTENT of EMAIL -->
+            </center>
+        </td>
+    </tr>
+</table>
+</body>
+</html>
