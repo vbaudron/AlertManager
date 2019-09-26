@@ -1,0 +1,166 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html bgcolor="#f3f7f8" style="background-color:#f3f7f8">
+<head>
+<title>{{title}}</title>
+<meta content="text/html; charset=utf-8" http-equiv="Content-Type"/>
+<meta content="width=device-width" name="viewport"/>
+<!-- Base CSS -->
+<style type="text/css">
+    /* GLOBAL */
+    * {
+	  margin:0;
+	  padding:0;
+    }
+
+    * {
+        font-family: "Helvetica Neue", "Helvetica", Helvetica, Arial, sans-serif;
+    }
+
+    img {
+        max-width: 100%;
+    }
+
+    body {
+	    -webkit-font-smoothing:antialiased;
+	    -webkit-text-size-adjust:none;
+    	width: 100% !important;
+	    height: 100% !important;
+    }
+
+    /* Base styles */
+    html {
+        background-color: #f3f7f8;
+    }
+
+    body {
+        background-color: #f3f7f8;
+        padding-top: 20px !important;
+        padding-bottom: 20px !important;
+    }
+
+    .page-width {
+        min-width: 465px;
+        max-width: 575px;
+        width: 100%;
+    }
+
+    .page-width-sm {
+      min-width: 300px;
+      max-width: 310px;
+      width: 100%;
+    }
+
+    .inner-width {
+      width: 465px;
+    }
+
+    .inner-width-sm {
+      width: 260px;
+    }
+
+    .center-table {
+        margin: 0 auto;
+        /*border:1px solid red;*/
+    }
+
+    .divider td {
+      border-bottom: 1px solid #E6E8E9;
+    }
+
+    td {
+        line-height: 22px !important;
+        font-family: "Helvetica Neue", "Helvetica", Helvetica, Arial, sans-serif;
+        font-size: 15px !important;
+        vertical-align: top;
+    }
+
+    table#body {
+        border: 1px solid #eaeef0;
+    }
+
+    table#body td {
+        background-color: #fff;
+    }
+
+    .color-seafoam      { color: #e2574c; }
+    .color-seafoam-dark { color: #00afab; }
+</style>
+<!-- Template specific CSS -->
+<style type="text/css">table#view-order td a:link {border:2px solid #e2574c !important;background-color:#fff !important;padding:15px !important;text-transform:uppercase !important;font-weight:bold !important;font-size:14px !important;text-decoration:none !important;color:#36454f !important;text-align:center !important}
+table#view-order td a:visited {border:2px solid #e2574c !important;background-color:#fff !important;padding:15px !important;text-transform:uppercase !important;font-weight:bold !important;font-size:14px !important;text-decoration:none !important;color:#36454f !important;text-align:center !important}
+table#view-order td a:hover {border:2px solid #e2574c !important;background-color:#fff !important;padding:15px !important;text-transform:uppercase !important;font-weight:bold !important;font-size:14px !important;text-decoration:none !important;color:#36454f !important;text-align:center !important}
+table#view-order td a:active {border:2px solid #e2574c !important;background-color:#fff !important;padding:15px !important;text-transform:uppercase !important;font-weight:bold !important;font-size:14px !important;text-decoration:none !important;color:#36454f !important;text-align:center !important}</style>
+</head>
+<body bgcolor="#f3f7f8" height="100% !important" style="-webkit-font-smoothing:antialiased; -webkit-text-size-adjust:none; width:100% !important; height:100% !important; background-color:#f3f7f8; padding-top:20px !important; padding-bottom:20px !important" width="100% !important">
+<!-- Header -->
+<style type="text/css">
+    table#header td.logo {
+        text-align: center;
+    }
+
+    table#header td.logo a {
+        display: inline-block;
+        padding: 30px 0;
+    }
+</style>
+<table cellpadding="0" cellspacing="0" class="page-width center-table" id="header" style="min-width:465px; max-width:575px; width:100%; margin:0 auto" width="100%">
+<tr>
+<td align="center" class="logo" style='line-height:30px !important; font-family:"Helvetica Neue", "Helvetica", Helvetica, Arial, sans-serif; font-size:15px !important; vertical-align:top; text-align:center'>
+<a data-click-track-id="2004" href={{image_link}} style="display:inline-block; padding:30px 0" target="_blank"><img height="auto" src="exclamation-mark.png" style="max-width:100%" width="60"/></a>
+</td>
+</tr>
+</table>
+<table cellpadding="0" cellspacing="0" class="page-width center-table" id="body" style="min-width:465px; max-width:575px; width:100%; margin:0 auto; border:1px solid #eaeef0" width="100%">
+<tr>
+<td bgcolor="#fff" style='line-height:22px !important; font-family:"Helvetica Neue", "Helvetica", Helvetica, Arial, sans-serif; font-size:15px !important; vertical-align:top; background-color:#fff'>
+<table cellpadding="0" cellspacing="0" class="inner-width center-table" id="heading" style="width:465px; margin:0 auto; border-bottom:1px solid #e4e4e4" width="465">
+<tr>
+<td align="center" bgcolor="#fff" style='line-height:22px !important; vertical-align:top; background-color:#fff; font-size:36px !important; font-family:"Helvetica Neue-Thin", "Helvetica Neue Thin", "Helvetica Neue", Helvetica, Arial, sans-serif; padding:40px 0 30px 0; text-align:center'>
+               {{email_title}}
+              </td>
+</tr>
+</table>
+<table cellpadding="0" cellspacing="0" class="center-table" id="copy" style="margin:40px 40px">
+<tr>
+<td bgcolor="#fff" style='line-height:22px !important; font-family:"Helvetica Neue", "Helvetica", Helvetica, Arial, sans-serif; font-size:15px !important; vertical-align:top; background-color:#fff'>
+<p style="margin-top:15px">{{message_txt}}</p>
+</td>
+</tr>
+</table>
+<table cellpadding="0" cellspacing="0" class="inner-width center-table" id="view-order" style="width:465px; margin:30px auto 30px auto; border-top:1px solid #e4e4e4" width="465">
+<tr>
+<td align="center" bgcolor="#fff" style='line-height:22px !important; font-family:"Helvetica Neue", "Helvetica", Helvetica, Arial, sans-serif; font-size:15px !important; vertical-align:top; background-color:#fff; text-align:center; padding-top:50px; padding-bottom:20px'>
+<a align="center" bgcolor="#fff" data-click-track-id="8788" href={{see_alert_link}} style="border:5px solid #e2574c; background-color:#fff; padding:15px; text-transform:uppercase; font-weight:bold; font-size:14px !important; text-decoration:none; color:#E2574C; text-align:center">
+    more details</a>
+</td>
+</tr>
+</table>
+</td>
+</tr>
+</table>
+<style type="text/css">table#footer td.copy a:link {color:#000 !important;font-weight:bold !important}
+table#footer td.copy a:visited {color:#000 !important;font-weight:bold !important}
+table#footer td.copy a:hover {color:#000 !important;font-weight:bold !important}
+table#footer td.copy a:active {color:#000 !important;font-weight:bold !important}</style>
+<table class="page-width center-table" id="footer" style="min-width:465px; max-width:575px; width:100%; margin:0 auto" width="100%">
+<tr>
+<td class="copy" style='line-height:22px !important; font-family:"Helvetica Neue", "Helvetica", Helvetica, Arial, sans-serif; font-size:15px !important; vertical-align:top; padding:30px 50px; color:#000'>
+      {{contact_us_txt}}<a href={{contact_us_link}} style="color:#000 !important; font-weight:bold" target="_blank">Contact us</a>.<br/><br/>Thank You,<br/> Team SOFTEE
+    </td>
+    </tr>
+    <tr>
+    <td></td>
+    </tr>
+    <tr>
+<td class="copy" style='line-height:12px !important; font-family:"Helvetica Neue", "Helvetica", Helvetica, Arial, sans-serif; font-size:8px !important; vertical-align:top; padding:30px 50px; color:#FFFFF'>
+<div>Icons made by <a href="https://www.flaticon.com/authors/pixel-buddha" title="Pixel Buddha">Pixel Buddha</a> from <a href="https://www.flaticon.com/"             title="Flaticon">www.flaticon.com</a> is licensed by <a href="http://creativecommons.org/licenses/by/3.0/"             title="Creative Commons BY 3.0" target="_blank">CC 3.0 BY</a></div>
+    </td>
+    </tr>
+</table>
+</table>
+</td>
+</tr>
+</table>
+
+</body>
+</html>

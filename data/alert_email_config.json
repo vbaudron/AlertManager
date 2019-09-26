@@ -1,29 +1,7 @@
 {
-  "subject" : "SOFTEE - Alert Notification | ",
+  "subject" : "| SOFTEE | You have an Alert ",
   "sender_email" : "noreply-alert@softee.fr",
-  "main_text_key": "text_message",
-  "title" : "Alert notification",
   "template_name" : "alert_email_template",
   "replacement" : [
-    {
-      "key" : "see_alert_link",
-      "text" : "https://docs.google.com/document/d/1El2zY9GKXHxD_lUO1lzab9lkOoAITuQciCszdhWhILE/edit?usp=sharing"
-    },
-    {
-      "key" : "email_title",
-      "text" : "Alert Notification"
-    },
-    {
-      "key" : "contact_us_link",
-      "text" : "https://docs.google.com/document/d/1gonOj1LeXX34fN1GZ0trGTsHLQHrTSzOtO3MmhKbCJo/edit?usp=sharing"
-    },
-    {
-      "key" : "image_link",
-      "text" : "http://www.behi.fr/softee-presentation/"
-    },
-    {
-      "key" : "message-txt",
-      "text" : "you have an alert regarding data"
-    }
   ]
 }

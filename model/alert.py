@@ -19,7 +19,7 @@ from model import utils
 from model.my_exception import EnumError, ConfigError, NoDataFoundInDatabase, StopCheckAlertDefinition
 from model.utils import get_day_name_from_datetime, get_data_from_json_file, get_str_from_file, \
     get_path_in_data_folder_of, my_sql, ALERT_TABLE_NAME, ALERT_TABLE_COMPO, \
-    SOURCE_PATH, iter_row, METER_TABLE_NAME, NOTIFICATION_NAME, ALERT_MANAGER_TABLE_NAME
+    SOURCE_PATH, iter_row, METER_TABLE_NAME, NOTIFICATION_NAME, ALERT_MANAGER_TABLE_NAME, get_path_in_source_folder_of
 from enum import Enum, auto, unique, Flag, IntEnum
 
 
@@ -817,6 +817,7 @@ class AlertNotification:
         return self._enough_time_between_notifications(datetime_to_check=datetime_to_check) \
                and self.is_notification_allowed_for_datetime(datetime_to_check=datetime_to_check)
 
+
     # PERIOD
     def _enough_time_between_notifications(self, datetime_to_check: datetime):
         """
@@ -999,11 +1000,10 @@ class Email:
         self.__sender_email = self.config["sender_email"]
         self.__email_content = get_str_from_file(self.get_file_path_name())
 
-    def generate_template(self, text_message: str):
-        self.email_content.replace(self.config["template_name"], text_message)
-        replacements = self.config["replacement"]
-        for r in replacements:
-            self.email_content.replace(r["key"], r["text"])
+    def generate_template(self, replacements: dict):
+        for key, value in replacements.items():
+            self.email_content.replace("{{" + key + "}}", value)
+
 
     def send(self, receiver_email: str):
         self.__receiver_email = receiver_email
@@ -1068,35 +1068,43 @@ class AlertStatus(Enum):
 class Alert:
     __id: int
     __datetime: datetime
-    __alert_definition_description: str
+    __alert_definition_id: id
     __value: float
     __data: float
     __status: AlertStatus
     __meter_id: int
 
-    def __init__(self, alert_definition_description: str, value: float, data: float, today: datetime, meter_id: int) -> None:
+    def __init__(self, alert_definition_id: int, value: float, data: float, today: datetime, meter_id: int) -> None:
         self.__value = value
         self.__data = data
         self.__datetime = today
         self.__meter_id = meter_id
         self.__status = AlertStatus.CURRENT
-        self.__alert_definition_description = alert_definition_description
+        self.__alert_definition_id = alert_definition_id
 
     def save(self):
         query = self.query_construction()
-        data = self.generate_data()
-        my_sql.execute_and_close(query=query, params=data)
-
-    def generate_data(self):
-        data = [
+        params = [
             self.__datetime,
-            self.__alert_definition_description,
+            self.__datetime,
             self.__data,
             self.__value,
             self.__status.value,
+            self.__alert_definition_id,
             self.__meter_id
          ]
-        return data
+
+        print("query", query)
+        print("params", params)
+
+
+        cursor = my_sql.generate_cursor()
+        cursor.execute(operation=query, params=params)
+        my_sql.commit()
+        self.__id = cursor.lastrowid
+        print("[Alert] saved with id :", self.__id)
+
+
 
     def query_construction(self):
         # PARAMS
@@ -1213,7 +1221,7 @@ class AlertDefinition:
             print("\n     ==>  for meter_id : {} is_idx = {}".format(meter_id, is_index))
             if self.calculator.is_alert_situation(meter_id=meter_id, is_index=bool(is_index)):
                 alert = Alert(
-                    alert_definition_description=self.description,
+                    alert_definition=self.__id,
                     value=self.calculator.value,
                     data=self.calculator.data,
                     today=today,
@@ -1221,7 +1229,15 @@ class AlertDefinition:
                 )
                 alert.save()
                 if self.notification.is_notification_allowed(datetime_to_check=today):
-                    pass  # TODO NOTIFY
+                    pass  # TODO NOTI
+
+    def notify(self, meter_id):
+        name = self.name
+        message = "We calculate that the value of the meter {} follows rules of the Alert Definition : {}".format(
+            meter_id,
+            al
+        )
+
 
     def find_is_index(self, meter_ids):
         format_param = ", ".join(["%s" for m in meter_ids])

@@ -1,166 +1,198 @@
-<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
-<html bgcolor="#f3f7f8" style="background-color:#f3f7f8">
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
 <head>
-<title>{{title}}</title>
-<meta content="text/html; charset=utf-8" http-equiv="Content-Type"/>
-<meta content="width=device-width" name="viewport"/>
-<!-- Base CSS -->
-<style type="text/css">
-    /* GLOBAL */
-    * {
-	  margin:0;
-	  padding:0;
-    }
-
-    * {
-        font-family: "Helvetica Neue", "Helvetica", Helvetica, Arial, sans-serif;
-    }
-
-    img {
-        max-width: 100%;
-    }
-
-    body {
-	    -webkit-font-smoothing:antialiased;
-	    -webkit-text-size-adjust:none;
-    	width: 100% !important;
-	    height: 100% !important;
-    }
-
-    /* Base styles */
-    html {
-        background-color: #f3f7f8;
-    }
-
-    body {
-        background-color: #f3f7f8;
-        padding-top: 20px !important;
-        padding-bottom: 20px !important;
-    }
-
-    .page-width {
-        min-width: 465px;
-        max-width: 575px;
-        width: 100%;
-    }
-
-    .page-width-sm {
-      min-width: 300px;
-      max-width: 310px;
-      width: 100%;
-    }
-
-    .inner-width {
-      width: 465px;
-    }
-
-    .inner-width-sm {
-      width: 260px;
-    }
-
-    .center-table {
-        margin: 0 auto;
-        /*border:1px solid red;*/
-    }
-
-    .divider td {
-      border-bottom: 1px solid #E6E8E9;
-    }
-
-    td {
-        line-height: 22px !important;
-        font-family: "Helvetica Neue", "Helvetica", Helvetica, Arial, sans-serif;
-        font-size: 15px !important;
-        vertical-align: top;
-    }
-
-    table#body {
-        border: 1px solid #eaeef0;
-    }
-
-    table#body td {
-        background-color: #fff;
-    }
-
-    .color-seafoam      { color: #e2574c; }
-    .color-seafoam-dark { color: #00afab; }
-</style>
-<!-- Template specific CSS -->
-<style type="text/css">table#view-order td a:link {border:2px solid #e2574c !important;background-color:#fff !important;padding:15px !important;text-transform:uppercase !important;font-weight:bold !important;font-size:14px !important;text-decoration:none !important;color:#36454f !important;text-align:center !important}
-table#view-order td a:visited {border:2px solid #e2574c !important;background-color:#fff !important;padding:15px !important;text-transform:uppercase !important;font-weight:bold !important;font-size:14px !important;text-decoration:none !important;color:#36454f !important;text-align:center !important}
-table#view-order td a:hover {border:2px solid #e2574c !important;background-color:#fff !important;padding:15px !important;text-transform:uppercase !important;font-weight:bold !important;font-size:14px !important;text-decoration:none !important;color:#36454f !important;text-align:center !important}
-table#view-order td a:active {border:2px solid #e2574c !important;background-color:#fff !important;padding:15px !important;text-transform:uppercase !important;font-weight:bold !important;font-size:14px !important;text-decoration:none !important;color:#36454f !important;text-align:center !important}</style>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <meta name="viewport" content="width=device-width">
+    <title>Alert Email</title>
+    <script src="https://kit.fontawesome.com/e7cc1e280d.js" crossorigin="anonymous"></script>
 </head>
-<body bgcolor="#f3f7f8" height="100% !important" style="-webkit-font-smoothing:antialiased; -webkit-text-size-adjust:none; width:100% !important; height:100% !important; background-color:#f3f7f8; padding-top:20px !important; padding-bottom:20px !important" width="100% !important">
-<!-- Header -->
-<style type="text/css">
-    table#header td.logo {
-        text-align: center;
-    }
-
-    table#header td.logo a {
-        display: inline-block;
-        padding: 30px 0;
-    }
+<body style="-moz-box-sizing:border-box;-ms-text-size-adjust:100%;-webkit-box-sizing:border-box;-webkit-text-size-adjust:100%;Margin:0;box-sizing:border-box;color:#0a0a0a;font-family:Helvetica,Arial,sans-serif;font-size:16px;font-weight:400;line-height:1.3;margin:0;min-width:100%;padding:0;text-align:left;width:100%!important">
+<style>
+    @media only screen{html{min-height:100%;background:#f3f3f3}}@media only screen and (max-width:596px){.small-float-center{margin:0 auto!important;float:none!important;text-align:center!important}.small-text-center{text-align:center!important}.small-text-left{text-align:left!important}.small-text-right{text-align:right!important}}@media only screen and (max-width:596px){.hide-for-large{display:block!important;width:auto!important;overflow:visible!important;max-height:none!important;font-size:inherit!important;line-height:inherit!important}}@media only screen and (max-width:596px){table.body table.container .hide-for-large,table.body table.container .row.hide-for-large{display:table!important;width:100%!important}}@media only screen and (max-width:596px){table.body table.container .callout-inner.hide-for-large{display:table-cell!important;width:100%!important}}@media only screen and (max-width:596px){table.body table.container .show-for-large{display:none!important;width:0;mso-hide:all;overflow:hidden}}@media only screen and (max-width:596px){table.body img{width:auto;height:auto}table.body center{min-width:0!important}table.body .container{width:95%!important}table.body .column,table.body .columns{height:auto!important;-moz-box-sizing:border-box;-webkit-box-sizing:border-box;box-sizing:border-box;padding-left:16px!important;padding-right:16px!important}table.body .column .column,table.body .column .columns,table.body .columns .column,table.body .columns .columns{padding-left:0!important;padding-right:0!important}table.body .collapse .column,table.body .collapse .columns{padding-left:0!important;padding-right:0!important}td.small-1,th.small-1{display:inline-block!important;width:8.33333%!important}td.small-2,th.small-2{display:inline-block!important;width:16.66667%!important}td.small-3,th.small-3{display:inline-block!important;width:25%!important}td.small-4,th.small-4{display:inline-block!important;width:33.33333%!important}td.small-5,th.small-5{display:inline-block!important;width:41.66667%!important}td.small-6,th.small-6{display:inline-block!important;width:50%!important}td.small-7,th.small-7{display:inline-block!important;width:58.33333%!important}td.small-8,th.small-8{display:inline-block!important;width:66.66667%!important}td.small-9,th.small-9{display:inline-block!important;width:75%!important}td.small-10,th.small-10{display:inline-block!important;width:83.33333%!important}td.small-11,th.small-11{display:inline-block!important;width:91.66667%!important}td.small-12,th.small-12{display:inline-block!important;width:100%!important}.column td.small-12,.column th.small-12,.columns td.small-12,.columns th.small-12{display:block!important;width:100%!important}table.body td.small-offset-1,table.body th.small-offset-1{margin-left:8.33333%!important;Margin-left:8.33333%!important}table.body td.small-offset-2,table.body th.small-offset-2{margin-left:16.66667%!important;Margin-left:16.66667%!important}table.body td.small-offset-3,table.body th.small-offset-3{margin-left:25%!important;Margin-left:25%!important}table.body td.small-offset-4,table.body th.small-offset-4{margin-left:33.33333%!important;Margin-left:33.33333%!important}table.body td.small-offset-5,table.body th.small-offset-5{margin-left:41.66667%!important;Margin-left:41.66667%!important}table.body td.small-offset-6,table.body th.small-offset-6{margin-left:50%!important;Margin-left:50%!important}table.body td.small-offset-7,table.body th.small-offset-7{margin-left:58.33333%!important;Margin-left:58.33333%!important}table.body td.small-offset-8,table.body th.small-offset-8{margin-left:66.66667%!important;Margin-left:66.66667%!important}table.body td.small-offset-9,table.body th.small-offset-9{margin-left:75%!important;Margin-left:75%!important}table.body td.small-offset-10,table.body th.small-offset-10{margin-left:83.33333%!important;Margin-left:83.33333%!important}table.body td.small-offset-11,table.body th.small-offset-11{margin-left:91.66667%!important;Margin-left:91.66667%!important}table.body table.columns td.expander,table.body table.columns th.expander{display:none!important}table.body .right-text-pad,table.body .text-pad-right{padding-left:10px!important}table.body .left-text-pad,table.body .text-pad-left{padding-right:10px!important}table.menu{width:100%!important}table.menu td,table.menu th{width:auto!important;display:inline-block!important}table.menu.small-vertical td,table.menu.small-vertical th,table.menu.vertical td,table.menu.vertical th{display:block!important}table.menu[align=center]{width:auto!important}table.button.small-expand,table.button.small-expanded{width:100%!important}table.button.small-expand table,table.button.small-expanded table{width:100%}table.button.small-expand table a,table.button.small-expanded table a{text-align:center!important;width:100%!important;padding-left:0!important;padding-right:0!important}table.button.small-expand center,table.button.small-expanded center{min-width:0}}
 </style>
-<table cellpadding="0" cellspacing="0" class="page-width center-table" id="header" style="min-width:465px; max-width:575px; width:100%; margin:0 auto" width="100%">
-<tr>
-<td align="center" class="logo" style='line-height:30px !important; font-family:"Helvetica Neue", "Helvetica", Helvetica, Arial, sans-serif; font-size:15px !important; vertical-align:top; text-align:center'>
-<a data-click-track-id="2004" href={{image_link}} style="display:inline-block; padding:30px 0" target="_blank"><img height="auto" src="exclamation-mark.png" style="max-width:100%" width="60"/></a>
-</td>
-</tr>
-</table>
-<table cellpadding="0" cellspacing="0" class="page-width center-table" id="body" style="min-width:465px; max-width:575px; width:100%; margin:0 auto; border:1px solid #eaeef0" width="100%">
-<tr>
-<td bgcolor="#fff" style='line-height:22px !important; font-family:"Helvetica Neue", "Helvetica", Helvetica, Arial, sans-serif; font-size:15px !important; vertical-align:top; background-color:#fff'>
-<table cellpadding="0" cellspacing="0" class="inner-width center-table" id="heading" style="width:465px; margin:0 auto; border-bottom:1px solid #e4e4e4" width="465">
-<tr>
-<td align="center" bgcolor="#fff" style='line-height:22px !important; vertical-align:top; background-color:#fff; font-size:36px !important; font-family:"Helvetica Neue-Thin", "Helvetica Neue Thin", "Helvetica Neue", Helvetica, Arial, sans-serif; padding:40px 0 30px 0; text-align:center'>
-               {{email_title}}
-              </td>
-</tr>
-</table>
-<table cellpadding="0" cellspacing="0" class="center-table" id="copy" style="margin:40px 40px">
-<tr>
-<td bgcolor="#fff" style='line-height:22px !important; font-family:"Helvetica Neue", "Helvetica", Helvetica, Arial, sans-serif; font-size:15px !important; vertical-align:top; background-color:#fff'>
-<p style="margin-top:15px">{{message_txt}}</p>
-</td>
-</tr>
-</table>
-<table cellpadding="0" cellspacing="0" class="inner-width center-table" id="view-order" style="width:465px; margin:30px auto 30px auto; border-top:1px solid #e4e4e4" width="465">
-<tr>
-<td align="center" bgcolor="#fff" style='line-height:22px !important; font-family:"Helvetica Neue", "Helvetica", Helvetica, Arial, sans-serif; font-size:15px !important; vertical-align:top; background-color:#fff; text-align:center; padding-top:50px; padding-bottom:20px'>
-<a align="center" bgcolor="#fff" data-click-track-id="8788" href={{see_alert_link}} style="border:5px solid #e2574c; background-color:#fff; padding:15px; text-transform:uppercase; font-weight:bold; font-size:14px !important; text-decoration:none; color:#E2574C; text-align:center">
-    more details</a>
-</td>
-</tr>
-</table>
-</td>
-</tr>
-</table>
-<style type="text/css">table#footer td.copy a:link {color:#000 !important;font-weight:bold !important}
-table#footer td.copy a:visited {color:#000 !important;font-weight:bold !important}
-table#footer td.copy a:hover {color:#000 !important;font-weight:bold !important}
-table#footer td.copy a:active {color:#000 !important;font-weight:bold !important}</style>
-<table class="page-width center-table" id="footer" style="min-width:465px; max-width:575px; width:100%; margin:0 auto" width="100%">
-<tr>
-<td class="copy" style='line-height:22px !important; font-family:"Helvetica Neue", "Helvetica", Helvetica, Arial, sans-serif; font-size:15px !important; vertical-align:top; padding:30px 50px; color:#000'>
-      {{contact_us_txt}}<a href={{contact_us_link}} style="color:#000 !important; font-weight:bold" target="_blank">Contact us</a>.<br/><br/>Thank You,<br/>Team SOFTEE
-    </td>
-    </tr>
-    <tr>
-    <td></td>
-    </tr>
-    <tr>
-<td class="copy" style='line-height:12px !important; font-family:"Helvetica Neue", "Helvetica", Helvetica, Arial, sans-serif; font-size:8px !important; vertical-align:top; padding:30px 50px; color:#FFFFF'>
-<div>Icons made by <a href="https://www.flaticon.com/authors/pixel-buddha" title="Pixel Buddha">Pixel Buddha</a> from <a href="https://www.flaticon.com/"             title="Flaticon">www.flaticon.com</a> is licensed by <a href="http://creativecommons.org/licenses/by/3.0/"             title="Creative Commons BY 3.0" target="_blank">CC 3.0 BY</a></div>
-    </td>
-    </tr>
-</table>
-</table>
-</td>
-</tr>
-</table>
+<table class="body" data-made-with-foundation=""
+       style="Margin:0;background:#f3f3f3;border-collapse:collapse;border-spacing:0;color:#0a0a0a;font-family:Helvetica,Arial,sans-serif;font-size:16px;font-weight:400;height:100%;line-height:1.3;margin:0;padding:0;text-align:left;vertical-align:top;width:100%">
+    <tbody>
+    <tr style="padding:0;text-align:left;vertical-align:top">
+        <td class="float-center" align="center" valign="top"
+            style="-moz-hyphens:auto;-webkit-hyphens:auto;Margin:0 auto;border-collapse:collapse!important;color:#0a0a0a;float:none;font-family:Helvetica,Arial,sans-serif;font-size:16px;font-weight:400;hyphens:auto;line-height:1.3;margin:0 auto;padding:0;text-align:center;vertical-align:top;word-wrap:break-word">
+            <center style="min-width:580px;width:100%">
+                <table align="center" class="container"
+                       style="Margin:0 auto;background:#fefefe;border-collapse:collapse;border-spacing:0;margin:0 auto;padding:0;text-align:inherit;vertical-align:top;width:580px">
+                    <tbody>
+                    <tr style="padding:0;text-align:left;vertical-align:top">
+                        <td style="-moz-hyphens:auto;-webkit-hyphens:auto;Margin:0;border-collapse:collapse!important;color:#0a0a0a;font-family:Helvetica,Arial,sans-serif;font-size:16px;font-weight:400;hyphens:auto;line-height:1.3;margin:0;padding:0;text-align:left;vertical-align:top;word-wrap:break-word">
+                            <table class="row" align="center"
+                                   style="border-collapse:collapse;border-spacing:0;display:table;padding:0;position:relative;text-align:left;vertical-align:top;width:100%">
+                                <tbody>
+                                <tr style="padding:0;text-align:left;vertical-align:top">
+                                    <th class="columns first last" align="center"
+                                        style="Margin:0 auto;color:#0a0a0a;font-family:Helvetica,Arial,sans-serif;font-size:16px;font-weight:400;line-height:1.3;margin:0 auto;padding:0;padding-bottom:16px;padding-left:16px;padding-right:16px;text-align:left">
+                                        <table style="border-collapse:collapse;border-spacing:0;padding:0;text-align:left;vertical-align:top;width:100%">
+                                            <tbody>
+                                            <tr style="padding:0;text-align:left;vertical-align:top">
+                                                <th style="Margin:0;color:#0a0a0a;font-family:Helvetica,Arial,sans-serif;font-size:16px;font-weight:400;line-height:1.3;margin:0;padding:0;text-align:left">
+                                                    <center style="min-width:580px;width:100%"><i
+                                                            class="fas fa-exclamation-circle fa-2x"
+                                                            style="color:#ec5840"></i></center>
+                                                </th>
+                                                <th class="expander"
+                                                    style="Margin:0;color:#0a0a0a;font-family:Helvetica,Arial,sans-serif;font-size:16px;font-weight:400;line-height:1.3;margin:0;padding:0!important;text-align:left;visibility:hidden;width:0"></th>
+                                            </tr>
+                                            </tbody>
+                                        </table>
+                                    </th>
+                                </tr>
+                                </tbody>
+                            </table>
+                            <table class="row" align="center"
+                                   style="border-collapse:collapse;border-spacing:0;display:table;padding:0;position:relative;text-align:left;vertical-align:top;width:100%">
+                                <tbody>
+                                <tr style="padding:0;text-align:left;vertical-align:top">
+                                    <th class="columns first last"
+                                        style="Margin:0 auto;color:#0a0a0a;font-family:Helvetica,Arial,sans-serif;font-size:16px;font-weight:400;line-height:1.3;margin:0 auto;padding:0;padding-bottom:16px;padding-left:16px;padding-right:16px;text-align:left">
+                                        <table style="border-collapse:collapse;border-spacing:0;padding:0;text-align:left;vertical-align:top;width:100%">
+                                            <tbody>
+                                            <tr style="padding:0;text-align:left;vertical-align:top">
+                                                <th style="Margin:0;color:#0a0a0a;font-family:Helvetica,Arial,sans-serif;font-size:16px;font-weight:400;line-height:1.3;margin:0;padding:0;text-align:left">
+                                                    <table class="row" align="center"
+                                                           style="border-collapse:collapse;border-spacing:0;display:table;padding:0;position:relative;text-align:left;vertical-align:top;width:100%">
+                                                        <tbody>
+                                                        <tr style="padding:0;text-align:left;vertical-align:top">
+                                                            <th class="columns first last"
+                                                                style="Margin:0 auto;color:#0a0a0a;font-family:Helvetica,Arial,sans-serif;font-size:16px;font-weight:400;line-height:1.3;margin:0 auto;padding:0;padding-bottom:16px;padding-left:0!important;padding-right:0!important;text-align:left">
+                                                                <table style="border-collapse:collapse;border-spacing:0;padding:0;text-align:left;vertical-align:top;width:100%">
+                                                                    <tbody>
+                                                                    <tr style="padding:0;text-align:left;vertical-align:top">
+                                                                        <th style="Margin:0;color:#0a0a0a;font-family:Helvetica,Arial,sans-serif;font-size:16px;font-weight:400;line-height:1.3;margin:0;padding:0;text-align:left">
+                                                                            <h1 class="text-center"
+                                                                                style="Margin:0;Margin-bottom:10px;color:inherit;font-family:Helvetica,Arial,sans-serif;font-size:34px;font-weight:400;line-height:1.3;margin:0;margin-bottom:10px;padding:0;text-align:center;word-wrap:normal">
+                                                                                You have an alert about {{name}}</h1></th>
+                                                                        <th class="expander"
+                                                                            style="Margin:0;color:#0a0a0a;font-family:Helvetica,Arial,sans-serif;font-size:16px;font-weight:400;line-height:1.3;margin:0;padding:0!important;text-align:left;visibility:hidden;width:0"></th>
+                                                                    </tr>
+                                                                    </tbody>
+                                                                </table>
+                                                            </th>
+                                                        </tr>
+                                                        </tbody>
+                                                    </table>
+                                                    <table class="row" align="center"
+                                                           style="border-collapse:collapse;border-spacing:0;display:table;padding:0;position:relative;text-align:left;vertical-align:top;width:100%">
+                                                        <tbody>
+                                                        <tr style="padding:0;text-align:left;vertical-align:top">
+                                                            <th class="columns first last"
+                                                                style="Margin:0 auto;color:#0a0a0a;font-family:Helvetica,Arial,sans-serif;font-size:16px;font-weight:400;line-height:1.3;margin:0 auto;padding:0;padding-bottom:16px;padding-left:0!important;padding-right:0!important;text-align:left">
+                                                                <table style="border-collapse:collapse;border-spacing:0;padding:0;text-align:left;vertical-align:top;width:100%">
+                                                                    <tbody>
+                                                                    <tr style="padding:0;text-align:left;vertical-align:top">
+                                                                        <th style="Margin:0;color:#0a0a0a;font-family:Helvetica,Arial,sans-serif;font-size:16px;font-weight:400;line-height:1.3;margin:0;padding:0;text-align:left">
+                                                                            {{message_txt}}
+                                                                        </th>
+                                                                        <th class="expander"
+                                                                            style="Margin:0;color:#0a0a0a;font-family:Helvetica,Arial,sans-serif;font-size:16px;font-weight:400;line-height:1.3;margin:0;padding:0!important;text-align:left;visibility:hidden;width:0"></th>
+                                                                    </tr>
+                                                                    </tbody>
+                                                                </table>
+                                                            </th>
+                                                        </tr>
+                                                        </tbody>
+                                                    </table>
+                                                    <table class="spacer"
+                                                           style="border-collapse:collapse;border-spacing:0;padding:0;text-align:left;vertical-align:top;width:100%">
+                                                        <tbody>
+                                                        <tr style="padding:0;text-align:left;vertical-align:top">
+                                                            <td height="16px"
+                                                                style="-moz-hyphens:auto;-webkit-hyphens:auto;Margin:0;border-collapse:collapse!important;color:#0a0a0a;font-family:Helvetica,Arial,sans-serif;font-size:16px;font-weight:400;hyphens:auto;line-height:1.3;margin:0;mso-line-height-rule:exactly;padding:0;text-align:left;vertical-align:top;word-wrap:break-word">
 
+                                                            </td>
+                                                        </tr>
+                                                        </tbody>
+                                                    </table>
+                                                    <table class="row" align="center"
+                                                           style="border-collapse:collapse;border-spacing:0;display:table;padding:0;position:relative;text-align:left;vertical-align:top;width:100%">
+                                                        <tbody>
+                                                        <tr style="padding:0;text-align:left;vertical-align:top">
+                                                            <th class="columns first last"
+                                                                style="Margin:0 auto;color:#0a0a0a;font-family:Helvetica,Arial,sans-serif;font-size:16px;font-weight:400;line-height:1.3;margin:0 auto;padding:0;padding-bottom:16px;padding-left:0!important;padding-right:0!important;text-align:left">
+                                                                <table style="border-collapse:collapse;border-spacing:0;padding:0;text-align:left;vertical-align:top;width:100%">
+                                                                    <tbody>
+                                                                    <tr style="padding:0;text-align:left;vertical-align:top">
+                                                                        <th style="Margin:0;color:#0a0a0a;font-family:Helvetica,Arial,sans-serif;font-size:16px;font-weight:400;line-height:1.3;margin:0;padding:0;text-align:left">
+                                                                            <center style="min-width:none!important;width:100%">
+                                                                                <table class="button radius alert"
+                                                                                       style="Margin:0 0 16px 0;border-collapse:collapse;border-spacing:0;margin:0 0 16px 0;padding:0;text-align:left;vertical-align:top;width:auto">
+                                                                                    <tbody>
+                                                                                    <tr style="padding:0;text-align:left;vertical-align:top">
+                                                                                        <td style="-moz-hyphens:auto;-webkit-hyphens:auto;Margin:0;border-collapse:collapse!important;color:#0a0a0a;font-family:Helvetica,Arial,sans-serif;font-size:16px;font-weight:400;hyphens:auto;line-height:1.3;margin:0;padding:0;text-align:left;vertical-align:top;word-wrap:break-word">
+                                                                                            <table style="border-collapse:collapse;border-spacing:0;padding:0;text-align:left;vertical-align:top;width:100%">
+                                                                                                <tbody>
+                                                                                                <tr style="padding:0;text-align:left;vertical-align:top">
+                                                                                                    <td style="-moz-hyphens:auto;-webkit-hyphens:auto;Margin:0;background:#ec5840;border:0 solid #ec5840;border-collapse:collapse!important;border-radius:3px;color:#fefefe;font-family:Helvetica,Arial,sans-serif;font-size:16px;font-weight:400;hyphens:auto;line-height:1.3;margin:0;padding:0;text-align:left;vertical-align:top;word-wrap:break-word">
+                                                                                                        <a href="#"
+                                                                                                           style="Margin:0;border:0 solid #ec5840;border-radius:3px;color:#fefefe;display:inline-block;font-family:Helvetica,Arial,sans-serif;font-size:16px;font-weight:700;line-height:1.3;margin:0;padding:8px 16px 8px 16px;text-align:left;text-decoration:none">See
+                                                                                                            Alert
+                                                                                                            Details</a>
+                                                                                                    </td>
+                                                                                                </tr>
+                                                                                                </tbody>
+                                                                                            </table>
+                                                                                        </td>
+                                                                                    </tr>
+                                                                                    </tbody>
+                                                                                </table>
+                                                                            </center>
+                                                                        </th>
+                                                                        <th class="expander"
+                                                                            style="Margin:0;color:#0a0a0a;font-family:Helvetica,Arial,sans-serif;font-size:16px;font-weight:400;line-height:1.3;margin:0;padding:0!important;text-align:left;visibility:hidden;width:0"></th>
+                                                                    </tr>
+                                                                    </tbody>
+                                                                </table>
+                                                            </th>
+                                                        </tr>
+                                                        </tbody>
+                                                    </table>
+                                                </th>
+                                                <th class="expander"
+                                                    style="Margin:0;color:#0a0a0a;font-family:Helvetica,Arial,sans-serif;font-size:16px;font-weight:400;line-height:1.3;margin:0;padding:0!important;text-align:left;visibility:hidden;width:0"></th>
+                                            </tr>
+                                            </tbody>
+                                        </table>
+                                    </th>
+                                </tr>
+                                </tbody>
+                            </table>
+                            <table class="row" align="center"
+                                   style="border-collapse:collapse;border-spacing:0;display:table;padding:0;position:relative;text-align:left;vertical-align:top;width:100%">
+                                <tbody>
+                                <tr style="padding:0;text-align:left;vertical-align:top">
+                                    <th class="columns first last"
+                                        style="Margin:0 auto;color:#0a0a0a;font-family:Helvetica,Arial,sans-serif;font-size:16px;font-weight:400;line-height:1.3;margin:0 auto;padding:0;padding-bottom:16px;padding-left:16px;padding-right:16px;text-align:left">
+                                        <table style="border-collapse:collapse;border-spacing:0;padding:0;text-align:left;vertical-align:top;width:100%">
+                                            <tbody>
+                                            <tr style="padding:0;text-align:left;vertical-align:top">
+                                                <th style="Margin:0;color:#0a0a0a;font-family:Helvetica,Arial,sans-serif;font-size:16px;font-weight:400;line-height:1.3;margin:0;padding:0;text-align:left">
+                                                    <p style="Margin:0;Margin-bottom:10px;color:#0a0a0a;font-family:Helvetica,Arial,sans-serif;font-size:16px;font-weight:400;line-height:1.3;margin:0;margin-bottom:10px;padding:0;text-align:left">
+                                                        If you have any questions, fell free to <a href="#"
+                                                                          style="Margin:0;color:#3E8EBC;font-family:Helvetica,Arial,sans-serif;font-weight:400;line-height:1.3;margin:0;padding:0;text-align:left;text-decoration:none">contact
+                                                        us</a></p></th>
+                                                <th class="expander"
+                                                    style="Margin:0;color:#0a0a0a;font-family:Helvetica,Arial,sans-serif;font-size:16px;font-weight:400;line-height:1.3;margin:0;padding:0!important;text-align:left;visibility:hidden;width:0"></th>
+                                            </tr>
+                                            </tbody>
+                                        </table>
+                                    </th>
+                                </tr>
+                                </tbody>
+                            </table>
+                        </td>
+                    </tr>
+                    </tbody>
+                </table>
+            </center>
+        </td>
+    </tr>
+    </tbody>
+</table>
 </body>
 </html>
