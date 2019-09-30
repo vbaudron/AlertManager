@@ -844,6 +844,7 @@ class AlertNotification:
         self.__email = email
         self.__notification_hours = hours
         self.__notification_days = days
+        self.__previous_notification_datetime = None
 
 
     def query_last_notification_time(self, alert_definition_id: int):
@@ -857,12 +858,11 @@ class AlertNotification:
         cursor = my_sql.generate_cursor()
         cursor.execute(operation=query, params=params)
         results = cursor.fetchall()
+        print("results =", results)
         if not results:
-            self.__previous_notification_datetime = None
+            return None
         else:
-            import pdb;pdb.set_trace()
-            last_time = datetime.today()
-            self.__previous_notification_datetime = utils.get_datetime_from_iso_str(last_time)
+            return results[0][0]
 
     # -- IS Notification ALLOWED --
 
@@ -891,7 +891,7 @@ class AlertNotification:
         print("CHECK if is enough_time_between_notifications")
 
         # get last notification time
-        self.query_last_notification_time(alert_definition_id=alert_definition_id)
+        self.__previous_notification_datetime = self.query_last_notification_time(alert_definition_id=alert_definition_id)
         if not self.previous_notification_datetime:
             return True
 
@@ -935,7 +935,7 @@ class AlertNotification:
             return bool(day.value & self.notification_days)
         except AttributeError:
             error = EnumError(except_enum=Day, wrong_value=day)
-            log.warning("889", error.__str__())
+            log.warning(error.__str__())
             return False
 
     # -- HOUR --
@@ -949,14 +949,14 @@ class AlertNotification:
             print("IS in notification hour" if result else "is NOT in notification hour")
             return result
         except AttributeError as error:
-            log.warning("831", error.__str__())
+            log.warning(error.__str__())
 
     def has_hour_in_notification_hours(self, hour: Hour) -> bool:
         try:
             return bool(hour.value & self.notification_hours)
         except AttributeError:
             error = EnumError(except_enum=Hour, wrong_value=hour)
-            log.warning("909", error.__str__())
+            log.warning(error.__str__())
             return False
 
 
@@ -1081,8 +1081,8 @@ class Email:
 # -----------------------------------------------------   ALERT  -------------------------------------------------------
 
 class AlertStatus(Enum):
-    CURRENT = 1
     ARCHIVE = 0
+    CURRENT = 1
 
 
 class Alert:
@@ -1185,7 +1185,6 @@ class AlertDefinition:
     __meter_ids: array
     __level: Level
     __status: AlertDefinitionStatus
-    __last_check: datetime
     __calculator: AlertCalculator
     __notification: AlertNotification
 
