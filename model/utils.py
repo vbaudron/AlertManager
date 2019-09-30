@@ -75,6 +75,7 @@ def enum_str_values(enum: Enum) -> "Str of each member of the enum":
     return my_str
 
 
+
 # __________________________________________________ MY SQL ____________________________________________________________
 
 
@@ -273,8 +274,8 @@ METER_TABLE_NAME = "bi_compteurs"
 NOTIFICATION_NAME = "alert_notification"
 NOTIFICATION_COMPO = {
     "id": "INT AUTO_INCREMENT PRIMARY KEY",
-    "period_unit": "VARCHAR(8)",
-    "period_quantity": "INT",
+    "period_unit": "VARCHAR(8) NOT NULL",
+    "period_quantity": "INT NOT NULL",
     "email": "VARCHAR(255)",
     "days_flag": "INT NOT NULL DEFAULT 0",
     "hours_flag": "INT NOT NULL DEFAULT 0"
@@ -379,3 +380,18 @@ ALERT_MANAGER_TABLE_COMPO = {
 
 if __name__ == '__main__':
     pass
+
+
+def insert_query_construction(compo, name):
+    # PARAMS
+    params_list = list(key for key in compo.keys())
+    params_list.pop(0)
+    params_str = ", ".join([param for param in params_list])
+
+    # Format
+    format_param = ", ".join(["%s" for param in params_list])
+
+    # QUERY
+    query = "INSERT INTO {} ({}) VALUES ({})".format(name, params_str, format_param)
+    print(query)
+    return query

@@ -1,29 +1,15 @@
 import random
 
 from model.alert import HandleDataFromDB, PeriodUnitDefinition, MyOperator, MyComparator, PeriodGeneratorType, \
-    ValueGeneratorType, Level, AlertStatus, AlertDefinitionStatus, Day, Hour, ValuePeriodType
+    ValueGeneratorType, Level, AlertDefinitionStatus, Day, Hour, ValuePeriodType
 from datetime import datetime, timedelta
 from model.utils import my_sql, METER_TABLE_NAME, TableToGenerate, NOTIFICATION_COMPO, NOTIFICATION_NAME, \
     CALCULATOR_COMPO, CALCULATOR_NAME, DEFINITION_COMPO, DEFINITION_TABLE_NAME, METER_DEFINITION_COMPO, \
-    METER_DEFINITIONS_ALERT_TABLE_NAME
+    METER_DEFINITIONS_ALERT_TABLE_NAME, insert_query_construction
 from scripts.alert_tables_creation import create_tables
 
 
 # _____________________________________  ****   INSERT METHODS   ****  _______________________________________________
-
-def insert_query_construction(compo, name):
-    # PARAMS
-    params_list = list(key for key in compo.keys())
-    params_list.pop(0)
-    params_str = ", ".join([param for param in params_list])
-
-    # Format
-    format_param = ", ".join(["%s" for param in params_list])
-
-    # QUERY
-    query = "INSERT INTO {} ({}) VALUES ({})".format(name, params_str, format_param)
-    print(query)
-    return query
 
 
 def insert_query_construction_without_id(compo, name):
@@ -182,7 +168,7 @@ OBJECTIF_TABLE_COMPO = {
     "id": "INT AUTO_INCREMENT PRIMARY KEY",
     "value": "DOUBLE",
     "time_unit" : "VARCHAR(8) DEFAULT NULL",
-    "r_compteur": "INT"
+    "r_compteur": "INT NOT NULL"
 }
 OBJECTIF_TABLE_FOREIGN_KEY = [
     "FOREIGN KEY (r_compteur) REFERENCES {}(id)".format(METER_TABLE_NAME)
@@ -202,7 +188,7 @@ def insert_data_in_bi_objectifs():
     params = [
         2.456,
         PeriodUnitDefinition.DAY.name,
-        1
+        4
     ]
     print("params", params)
     my_sql.execute_and_close(query=query, params=params)

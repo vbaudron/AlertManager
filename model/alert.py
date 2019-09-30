@@ -19,7 +19,8 @@ from model import utils
 from model.my_exception import EnumError, ConfigError, NoDataFoundInDatabase, StopCheckAlertDefinition
 from model.utils import get_day_name_from_datetime, get_data_from_json_file, get_str_from_file, \
     get_path_in_data_folder_of, my_sql, ALERT_TABLE_NAME, ALERT_TABLE_COMPO, \
-    SOURCE_PATH, iter_row, METER_TABLE_NAME, NOTIFICATION_NAME, ALERT_MANAGER_TABLE_NAME, get_path_in_source_folder_of
+    SOURCE_PATH, iter_row, METER_TABLE_NAME, NOTIFICATION_NAME, ALERT_MANAGER_TABLE_NAME, get_path_in_source_folder_of, \
+    ALERT_DEFINITION_NOTIFICATION_TIME, ALERT_DEFINITION_NOTIFICATION_TIME_COMPO
 from enum import Enum, auto, unique, Flag, IntEnum
 
 
@@ -284,12 +285,18 @@ class SimpleDBBasedValueGenerator(DataBaseValueGenerator, ValueGenerator):  # GO
     def __init__(self) -> None:
         super().__init__()
 
-    def get_value_in_db(self, meter_id: int):
+    def get_value_in_db(self, meter_id: int, is_index: bool):
         query = """SELECT o.value, o.time_unit from bi_objectifs o where o.r_compteur=%s"""
         params = [meter_id]
+
+        print("Find Objectif :")
+        print("\tquery", query)
+        print("\tparams", params)
+
         cursor = my_sql.generate_cursor()
         cursor.execute(operation=query, params=params)
         result = cursor.fetchall()
+        print("\tresult", result)
         value, time_unit = result[0]
         if time_unit:
             period_unit = PeriodUnitDefinition(time_unit)
@@ -304,6 +311,13 @@ class PeriodBasedValueGenerator(DataBaseValueGenerator, ValueGenerator):
 
     def __init__(self, operator: MyOperator, unit: str, quantity: int, today: datetime) -> None:
         super().__init__()
+        if not unit or not quantity:
+            msg = "valid 'value_period_unit' and 'value_period_quantity' NEEDED"
+            msg += "(found respectively '{}' and '{}'".format(
+                unit,
+                quantity
+            )
+            raise ConfigError(obj=self, msg=msg)
         self.generate_period(quantity=quantity, unit=unit, today=today)
         self.__operator = operator
 
@@ -312,6 +326,7 @@ class PeriodBasedValueGenerator(DataBaseValueGenerator, ValueGenerator):
         self.__period = period_generator.get_pertinent_period()
 
     def get_value_in_db(self, meter_id: int, is_index: bool):
+        print("find values in", self.__period)
         hdl = HandleDataFromDB(period=self.__period)
         result = hdl.get_data_from_db(meter_id=meter_id, is_index=is_index)
         if result:
@@ -322,7 +337,7 @@ class PeriodBasedValueGenerator(DataBaseValueGenerator, ValueGenerator):
 
 
 class NoPeriodBasedValueGenerator(ValueGenerator):
-    def calculate_value(self, meter_id: int):
+    def calculate_value(self, meter_id: int, is_index:bool):
         pass
 
     def __init__(self, value: float) -> None:
@@ -340,7 +355,11 @@ class AlertValue:
     __value: float  # value to compare with
 
     def __init__(self, value_type: str, value_number: float):
-        self.__value_generator_type = ValueGeneratorType[value_type]
+        try:
+            self.__value_generator_type = ValueGeneratorType[value_type]
+        except KeyError:
+            raise EnumError(ValueGeneratorType, wrong_value=value_type)
+
         self.__value_number = value_number
 
     def set_value_generator(self, end_date: datetime, unit: str, quantity: int, operator: MyOperator):
@@ -358,6 +377,7 @@ class AlertValue:
             self.__value_generator = SimpleDBBasedValueGenerator()
 
     def calculate_value(self, meter_id: int, is_index: bool):
+        print("value type :", self.value_generator_type.name)
         self.value_generator.calculate_value(meter_id=meter_id, is_index=is_index)
 
     @property
@@ -567,7 +587,7 @@ class AlertCalculator:
                  value_number: float,
                  value_period_type: str,
                  hour_start: int,
-                 hour_end:int,
+                 hour_end: int,
                  acceptable_diff: bool,
                  last_check: datetime,
                  today: datetime):
@@ -576,8 +596,20 @@ class AlertCalculator:
         self.__today = today
 
         self.__acceptable_diff = acceptable_diff
-        self.__operator = MyOperator(operator)
-        self.__comparator = MyComparator(comparator)
+
+        # OPERATOR
+        try:
+            self.__operator = MyOperator[operator]
+        except KeyError:
+            raise EnumError(MyOperator, wrong_value=operator)
+
+        # COMPARATOR
+        try:
+            self.__comparator = MyComparator(comparator)
+        except ValueError:
+            raise EnumError(MyComparator, wrong_value=comparator)
+
+
 
         # ALERT DATA
         self.__alert_data = AlertData(
@@ -596,6 +628,8 @@ class AlertCalculator:
             value_type=value_type
         )
 
+        self.check_non_coherent_config(value_type=value_type, value_period_type=value_period_type)
+
         self.__handle_alert_value_generator(
             today=today,
             value_period_type=value_period_type,
@@ -603,6 +637,8 @@ class AlertCalculator:
             data_period_quantity=data_period_quantity,
             operator=self.__operator
         )
+
+
 
     def __handle_alert_value_generator(self,
                                        today: datetime,
@@ -637,8 +673,20 @@ class AlertCalculator:
         )
 
 
-    def check_non_coherent_config(self):
-        if self.acceptable_diff and self.alert_value.value_generator_type is ValueGeneratorType.USER_BASED_VALUE:
+    def check_non_coherent_config(self, value_type, value_period_type):
+        try:
+            vt = ValueGeneratorType[value_type]
+        except KeyError:
+            raise EnumError(ValueGeneratorType, wrong_value=value_type)
+
+        if vt is ValueGeneratorType.PERIOD_BASED_VALUE and not value_period_type:
+            raise ConfigError(
+                self.__alert_value,
+                "Since 'value_type' is '{}' 'value_period_type' can not be null".format(
+                    ValueGeneratorType.PERIOD_BASED_VALUE.name
+                )
+            )
+        if self.acceptable_diff and vt is ValueGeneratorType.USER_BASED_VALUE:
             raise ConfigError(self, "acceptable_diff and ValueGeneratorType.USER_BASED_VALUE not compatible")
 
     # -- Find Value that will be Compare with Data --
@@ -657,12 +705,15 @@ class AlertCalculator:
         data_from_db = self.alert_data.get_all_data_in_db(meter_id=meter_id, is_index=is_index)
         print("data from db :", data_from_db)
         if not data_from_db:
-            log.warning("no data found in db for meter id {}".format(meter_id))
-            return False
+            raise NoDataFoundInDatabase("no data found in db for meter id {}".format(meter_id))
+        print("operator :", self.__operator.name)
         self.__data = self.__operator.calculate(data_from_db)
         print("____________________  DATA  :", self.__data)
+
         self.__value = self.__get_value(meter_id=meter_id, is_index=is_index)
         print("____________________  VALUE :", self.__value)
+
+        print("\n --- Comparaison ---\n is data {} value ? ".format(self.comparator.name))
         return self.comparator.compare(self.data, self.value)
 
     # --- PROPERTIES ---
@@ -772,9 +823,9 @@ class Hour(Flag):
         name = "H_" + str(number)
         return Hour[name]
 
-    @property
-    def int_hour(self) -> int:
-        return int(self.name.split("_")[1])
+  #  @property
+  #  def int_hour(self) -> int:
+  #      return int(self.name.split("_")[1])
 
 
 class AlertNotification:
@@ -795,10 +846,10 @@ class AlertNotification:
         self.__notification_days = days
 
 
-    def set_last_notification_time(self, alert_definition_id: int):
-        query = """ SELECT notification_time FROM {} 
+    def query_last_notification_time(self, alert_definition_id: int):
+        query = """ SELECT notification_datetime FROM {} 
                     WHERE alert_definition_id=%s AND notification_id=%s 
-                    ORDER BY notification_time DESC LIMIT 1""".format(NOTIFICATION_NAME)
+                    ORDER BY notification_datetime DESC LIMIT 1""".format(ALERT_DEFINITION_NOTIFICATION_TIME)
 
         params = (alert_definition_id, self.__id)
 
@@ -806,20 +857,27 @@ class AlertNotification:
         cursor = my_sql.generate_cursor()
         cursor.execute(operation=query, params=params)
         results = cursor.fetchall()
-        import pdb;pdb.set_trace()
-        last_time = datetime.today()
-        self.__previous_notification_datetime = utils.get_datetime_from_iso_str(last_time)
+        if not results:
+            self.__previous_notification_datetime = None
+        else:
+            import pdb;pdb.set_trace()
+            last_time = datetime.today()
+            self.__previous_notification_datetime = utils.get_datetime_from_iso_str(last_time)
 
     # -- IS Notification ALLOWED --
 
     def is_notification_allowed(self, datetime_to_check: datetime, alert_definition_id: int):
-        self.set_last_notification_time(alert_definition_id=alert_definition_id)
-        return self._enough_time_between_notifications(datetime_to_check=datetime_to_check) \
-               and self.is_notification_allowed_for_datetime(datetime_to_check=datetime_to_check)
+        return self.is_notification_allowed_for_datetime(
+            datetime_to_check=datetime_to_check
+        ) and self._enough_time_between_notifications(
+            alert_definition_id=alert_definition_id,
+            datetime_to_check=datetime_to_check
+        )
 
 
-    # PERIOD
-    def _enough_time_between_notifications(self, datetime_to_check: datetime):
+    # [IS_ALLOWED] Period recurrency
+
+    def _enough_time_between_notifications(self, alert_definition_id: int, datetime_to_check: datetime):
         """
                check if we are allowed to send a new notification
 
@@ -829,6 +887,14 @@ class AlertNotification:
                :type datetime_to_check: datetime
 
                """
+
+        print("CHECK if is enough_time_between_notifications")
+
+        # get last notification time
+        self.query_last_notification_time(alert_definition_id=alert_definition_id)
+        if not self.previous_notification_datetime:
+            return True
+
         # get Time between both date
         delta = datetime_to_check - self.previous_notification_datetime
 
@@ -837,12 +903,16 @@ class AlertNotification:
 
         return count >= self.number
 
-    # DATETIME
+    # [IS_ALLOWED] Datetime
     def is_notification_allowed_for_datetime(self, datetime_to_check: datetime):
+        print("CHECK if is_notification_allowed_for_datetime")
         return self.is_datetime_in_notification_days(
             datetime_to_check=datetime_to_check
         ) and self.is_datetime_in_notification_hours(
             datetime_to_check=datetime_to_check)
+
+
+    # -- DAY --
 
     def is_datetime_in_notification_days(self, datetime_to_check: datetime) -> bool:
         """
@@ -855,68 +925,10 @@ class AlertNotification:
         try:
             day = get_day_name_from_datetime(my_datetime=datetime_to_check)
             result = self.has_day_in_notification_days(Day[day.upper()])
+            print("IS in notification day" if result else "is NOT in notification day")
             return result
         except AttributeError as error:
             log.warning("823", error.__str__())
-
-    def is_datetime_in_notification_hours(self, datetime_to_check: datetime):
-        try:
-            int_hour = datetime_to_check.hour
-            hour = Hour.get_from_int(number=int_hour)
-            return self.has_hour_in_notification_hours(hour=hour)
-        except AttributeError as error:
-            log.warning("831", error.__str__())
-
-    # -- SET DATA FROM JSON --
-
-    def set_notification_days(self, days_list: array) -> None:
-        """
-        Replace the current Notification Days by the one in Param
-
-        :param days_list: Days that we have to watch
-        :type days_list: List of str Element representing Day
-
-        """
-        self.reset_notification_days()
-        try:
-            if days_list:
-                for day in days_list:
-                    enum_day = Day[day]
-                    self.add_day_to_notification_days(enum_day)
-        except KeyError:
-            error = EnumError(except_enum=Day, wrong_value=day)
-            log.warning("851", error.__str__())
-
-    def set_notification_hours(self, list_hours: array):
-        self.reset_notification_hours()
-        try:
-            if list_hours:
-                for int_hour in list_hours:
-                    hour = Hour.get_from_int(int_hour)
-                    self.add_notification_hour(hour)
-        except KeyError:
-            error = EnumError(except_enum=Hour, wrong_value=int_hour)
-            log.warning("862", error.__str__())
-
-    # -- UTILS --
-    # days
-
-    def add_day_to_notification_days(self, day: Day) -> None:
-        try:
-            self.__notification_days |= day.value
-        except AttributeError:
-            error = EnumError(except_enum=Day, wrong_value=day)
-            log.warning("872", error.__str__())
-
-    def remove_day_from_notification_days(self, day: Day) -> None:
-        try:
-            self.__notification_days ^= day.value
-        except AttributeError:
-            error = EnumError(except_enum=Day, wrong_value=day)
-            log.warning("879", error.__str__())
-
-    def reset_notification_days(self) -> None:
-        self.__notification_days = Day.NONE.value
 
     def has_day_in_notification_days(self, day: Day) -> bool:
         try:
@@ -926,17 +938,18 @@ class AlertNotification:
             log.warning("889", error.__str__())
             return False
 
-    # Hours
+    # -- HOUR --
 
-    def reset_notification_hours(self):
-        self.__notification_hours = Hour.NONE.value
-
-    def add_notification_hour(self, hour: Hour):
+    def is_datetime_in_notification_hours(self, datetime_to_check: datetime):
         try:
-            self.__notification_hours |= hour.value
-        except AttributeError:
-            error = EnumError(except_enum=Hour, wrong_value=hour)
-            log.warning("902", error.__str__())
+            int_hour = datetime_to_check.hour
+            hour = Hour.get_from_int(number=int_hour)
+            print("int_hour = {} Hour.name = {} hour.value = {}".format(int_hour, hour.name, hour.value))
+            result = self.has_hour_in_notification_hours(hour=hour)
+            print("IS in notification hour" if result else "is NOT in notification hour")
+            return result
+        except AttributeError as error:
+            log.warning("831", error.__str__())
 
     def has_hour_in_notification_hours(self, hour: Hour) -> bool:
         try:
@@ -946,12 +959,10 @@ class AlertNotification:
             log.warning("909", error.__str__())
             return False
 
-    def remove_hour_from_notification_hours(self, hour: Hour) -> None:
-        try:
-            self.__notification_hours ^= hour.value
-        except AttributeError:
-            error = EnumError(except_enum=Hour, wrong_value=hour)
-            log.warning("917", error.__str__())
+
+    @property
+    def id(self):
+        return self.__id
 
     @property
     def number(self):
@@ -1008,15 +1019,24 @@ class Email:
     def send(self, receiver_email: str):
         self.__receiver_email = receiver_email
         self.__message = MIMEMultipart("alternative")
-        self.message["Subject"] = self.subject
-        self.message["From"] = self.sender_email
-        self.message["To"] = self.receiver_email
+        self.__message["Subject"] = self.subject
+        self.__message["From"] = self.sender_email
+        self.__message["To"] = self.receiver_email
 
         html = MIMEText(self.email_content, "html")
-        self.message.attach(html)
+        self.__message.attach(html)
 
-        with smtplib.SMTP("localhost") as server:
-            server.send_message(from_addr=self.sender_email, to_addrs=self.receiver_email, msg=html.as_string())
+        try:
+            with smtplib.SMTP("localhost", port=8025) as connection:
+ #               import pdb;pdb.set_trace()
+
+                connection.send_message(from_addr=self.sender_email, to_addrs=self.receiver_email, msg=self.__message)
+             #   connection.sendmail(from_addr=self.sender_email, to_addrs=self.receiver_email, msg=self.__message.as_string())
+                print("mail send to", self.receiver_email)
+                return True
+        except Exception as error:
+            log.error(error)
+            return False
 
     def email_config_path(self, filename: str):
         config_path = get_path_in_data_folder_of(filename)
@@ -1104,8 +1124,6 @@ class Alert:
         self.__id = cursor.lastrowid
         print("[Alert] saved with id :", self.__id)
 
-
-
     def query_construction(self):
         # PARAMS
         params_list = list(key for key, value in ALERT_TABLE_COMPO.items())
@@ -1119,6 +1137,10 @@ class Alert:
         query = "INSERT INTO {} ({}) VALUES ({})".format(ALERT_TABLE_NAME, params_str, format_param)
         print(query)
         return query
+
+    @property
+    def id(self):
+        return self.__id
 
 
 # -----------------------------------------------   ALERT DEFINITION   -------------------------------------------------
@@ -1153,6 +1175,8 @@ class AlertDefinition:
     - its NOTIFICATION - template, period of watch
     - an ALERT CREATION - date, invalid data ...
     """
+
+    ALERT_EMAIL_CONFIG_FILENAME = "alert_email_config.json"
 
     __name: str
     __id: int
@@ -1201,11 +1225,12 @@ class AlertDefinition:
             last_check=last_check
         )
 
+
     @property
     def is_active(self) -> bool:
         return self.__status is AlertDefinitionStatus.ACTIVE
 
-    # CHECK
+    # ---- CHECK ----
     def check(self, today: datetime):
         """
         Check if we are in alert situation for each meter ids according to this Alert Definition
@@ -1215,31 +1240,65 @@ class AlertDefinition:
 
         """
         print("\n______________________________________________________ CHECK AlertDefinition", self.__id)
-        results = self.find_is_index(meter_ids=self.meter_ids)
+        results = AlertDefinition.find_is_index(meter_ids=self.meter_ids)
         print("meters_ids to Handle :", self.__meter_ids)
         for meter_id, is_index in results:
             print("\n     ==>  for meter_id : {} is_idx = {}".format(meter_id, is_index))
             if self.calculator.is_alert_situation(meter_id=meter_id, is_index=bool(is_index)):
+                print("____________________  this IS an Alert Situation")
                 alert = Alert(
-                    alert_definition=self.__id,
+                    alert_definition_id=self.__id,
                     value=self.calculator.value,
                     data=self.calculator.data,
                     today=today,
                     meter_id=meter_id
                 )
                 alert.save()
-                if self.notification.is_notification_allowed(datetime_to_check=today):
-                    pass  # TODO NOTI
+                print("____________________  Notify ?")
+                if self.notification.is_notification_allowed(datetime_to_check=today, alert_definition_id=self.__id):
+                    self.notify(meter_id=meter_id, alert=alert, time=today)
+            else:
+                print("____________________  this IS NOT an Alert Situation")
 
-    def notify(self, meter_id):
-        name = self.name
-        message = "We calculate that the value of the meter {} follows rules of the Alert Definition : {}".format(
-            meter_id,
-            al
+    # ---- NOTIFY ----
+    def notify(self, meter_id, alert, time: datetime):
+        replacements = {
+            "name": self.name,
+            "message_txt": "We calculate that the value of the meter {} follows rules of the Alert Definition : {}".format(
+                meter_id,
+                self.__name
+            ),
+            "button_link": "http://dev.emanager.softee.fr/alert/{}".format(alert.id)
+        }
+        email = Email()
+        email.prepare(filename=AlertDefinition.ALERT_EMAIL_CONFIG_FILENAME)
+        email.generate_template(replacements=replacements)
+        if email.send(self.notification.email):
+            print("email SEND")
+            self.add_notification_in_db(time=time)
+
+    def add_notification_in_db(self, time: datetime):
+        query = utils.insert_query_construction(
+            name=ALERT_DEFINITION_NOTIFICATION_TIME,
+            compo=ALERT_DEFINITION_NOTIFICATION_TIME_COMPO
         )
+        params = [
+            self.notification.id,
+            self.id,
+            time
+        ]
 
+        print("query", query)
+        print("params", params)
 
-    def find_is_index(self, meter_ids):
+        cursor = my_sql.generate_cursor()
+        cursor.execute(operation=query, params=params)
+        my_sql.commit()
+
+    # ---- is_idx query ----
+
+    @staticmethod
+    def find_is_index(meter_ids):
         format_param = ", ".join(["%s" for m in meter_ids])
         query = "select id, IS_INDEX from {} where id IN ({})".format(METER_TABLE_NAME, format_param)
         print(query)
@@ -1288,6 +1347,7 @@ class AlertManager:
     __today: datetime
 
     def __init__(self):
+        print("\n\nALERT MANAGER *** INIT ***")
         self.__today = datetime.today()
         data = self.get_alert_def_in_db()
         self.__alert_definition_list = list()
@@ -1305,8 +1365,8 @@ class AlertManager:
             try:
                 alert_definition = AlertDefinition(setup=setup, last_check=last_check, today=self.today)
                 self.__alert_definition_list.append(alert_definition)
-            except (KeyError, ConfigError) as error:
-                log.warning("1245", error.__str__())
+            except (KeyError, ConfigError, EnumError) as error:
+                log.error("[ALERT_DEFINITION_{}] {}".format(setup["id"], error.__str__()))
 
     def start_check(self):
         print("\n\nALERT MANAGER *** START ***")
@@ -1314,7 +1374,7 @@ class AlertManager:
             try:
                 alert_definition.check(today=self.today)
             except StopCheckAlertDefinition as error:
-                log.warning("AlertDefinition " + str(alert_definition.id) + " : " + str(error))
+                log.warning("[ALERT_DEFINITION_{}] {}".format(alert_definition.id, error.__str__()))
 
     def save(self):
         print("\n\nALERT MANAGER *** SAVE ***")
