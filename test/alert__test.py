@@ -24,6 +24,7 @@ class NotificationTest(unittest.TestCase):
         self.monday = datetime(2019, 7, 29)  # 29 July 2019 was a MONDAY
         self.saturday = datetime(2019, 7, 27)  # 27 July 2019 was a SATURDAY
 
+        self.notification_id = 1
         self.number = 1
         self.period = NotificationPeriod.DAY
         self.email = "test@test.com"
@@ -35,14 +36,26 @@ class NotificationTest(unittest.TestCase):
         ]
         self.previous_notification_datetime = None
 
+    def generate_hours_flag(self):
+        hours = 0
+        for hour in self.notification_hours:
+            hours |= hour.value
+        return hours
+
+    def generate_days_flag(self):
+        days = 0
+        for day in self.notification_days:
+            days |= day.value
+        return days
+
     def generate_setup(self):
         self.setup = {
-            "number": self.number,
-            "period": self.period.name,
-            "email": self.email,
-            "notification_days": [day.name for day in self.notification_days],
-            "notification_hours": [hour.int_hour for hour in self.notification_hours],
-            "previous_notification_datetime": self.previous_notification_datetime.isoformat() if self.previous_notification_datetime else None
+            "notification_id": self.notification_id,
+            "notification_period_quantity": self.number,
+            "notification_period_unit": self.period.name,
+            "notification_email": self.email,
+            "notification_days": self.generate_days_flag(),
+            "notification_hours": self.generate_hours_flag(),
         }
 
     def update_and_generate_alert_notification(self) -> AlertNotification:
@@ -50,7 +63,14 @@ class NotificationTest(unittest.TestCase):
         return self.get_alert_notification()
 
     def get_alert_notification(self) -> AlertNotification:
-        return AlertNotification(self.setup)
+        return AlertNotification(
+            notification_id=self.setup["notification_id"],
+            period_unit=self.setup["notification_period_unit"],
+            period_quantity=self.setup["notification_period_quantity"],
+            email=self.setup["notification_email"],
+            days=self.setup["notification_days"],
+            hours=self.setup["notification_hours"],
+        )
 
     # INIT
     def test__init(self):
