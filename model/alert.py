@@ -135,9 +135,9 @@ class PeriodUnitDefinition(Enum):
        go_past : it is the method associated to calculate the start date from the end_date
    """
     DAY = "DAY", go_past_with_days, 24
-    WEEK = "WEEK", go_past_with_weeks, (7 * 24)
-    MONTH = "MONTH", go_past_with_months, (30 * 24)
-    YEAR = "YEAR", go_past_with_years, (365 * 24)
+    WEEK = "WEEK", go_past_with_weeks, 7 * 24
+    MONTH = "MONTH", go_past_with_months, 30 * 24
+    YEAR = "YEAR", go_past_with_years, 365 * 24
 
     def __new__(cls, str_name, method, nb_hour):
         obj = object.__new__(cls)
@@ -224,8 +224,12 @@ class UserBasedGoBackPeriodGenerator(PeriodGenerator):
         self.__generate_period(to_date=to_date)
 
     def __generate_period_definition(self, unit, quantity: int):
+        print("__generate_period_definition UNIT", unit)
         if not isinstance(unit, PeriodUnitDefinition):
-            unit = PeriodUnitDefinition(unit)
+            try :
+                unit = PeriodUnitDefinition(unit)
+            except ValueError:
+                raise EnumError(except_enum=PeriodUnitDefinition, wrong_value=unit)
         self.__period_definition = PeriodDefinition(unit=unit, quantity=quantity)
 
     def __generate_period(self, to_date: datetime):
@@ -242,10 +246,12 @@ class ValueGeneratorType(Enum):
     SIMPLE_DB_BASED_VALUE = auto()
     PERIOD_BASED_VALUE = auto()
 
+
 @unique
 class ValuePeriodType(Enum):
     LAST_YEAR = auto()
     LAST_DATA_PERIOD = auto()
+
 
 # -- class
 class ValueGenerator(ABC):
@@ -265,6 +271,9 @@ class UserBasedValueGenerator(ValueGenerator):
     def __init__(self, user_data: int) -> None:
         super().__init__()
         self._value = user_data
+
+    def calculate_value(self, meter_id: int):
+        pass
 
 
 class DataBaseValueGenerator(ABC):
@@ -309,20 +318,20 @@ class PeriodBasedValueGenerator(DataBaseValueGenerator, ValueGenerator):
     __period: Period
     __operator: MyOperator
 
-    def __init__(self, operator: MyOperator, unit: str, quantity: int, today: datetime) -> None:
+    def __init__(self, operator: MyOperator, unit: str, quantity: int, end_date: datetime) -> None:
         super().__init__()
-        if not unit or not quantity:
+        if not unit or not quantity or quantity <= 0:
             msg = "valid 'value_period_unit' and 'value_period_quantity' NEEDED"
             msg += "(found respectively '{}' and '{}'".format(
                 unit,
                 quantity
             )
             raise ConfigError(obj=self, msg=msg)
-        self.generate_period(quantity=quantity, unit=unit, today=today)
+        self.generate_period(quantity=quantity, unit=unit, end_date=end_date)
         self.__operator = operator
 
-    def generate_period(self, unit: str, quantity: int, today: datetime):
-        period_generator = UserBasedGoBackPeriodGenerator(quantity=quantity, unit=unit, to_date=today)
+    def generate_period(self, unit: str, quantity: int, end_date: datetime):
+        period_generator = UserBasedGoBackPeriodGenerator(quantity=quantity, unit=unit, to_date=end_date)
         self.__period = period_generator.get_pertinent_period()
 
     def get_value_in_db(self, meter_id: int, is_index: bool):
@@ -355,10 +364,11 @@ class AlertValue:
     __value: float  # value to compare with
 
     def __init__(self, value_type: str, value_number: float):
+        print(self.__class__.__name__, " in creation ...")
         try:
             self.__value_generator_type = ValueGeneratorType[value_type]
         except KeyError:
-            raise EnumError(ValueGeneratorType, wrong_value=value_type)
+            raise EnumError(ValueGeneratorType, wrong_value=value_type, where=self.__class__.__name__)
 
         self.__value_number = value_number
 
@@ -371,7 +381,7 @@ class AlertValue:
                 operator=operator,
                 unit=unit,
                 quantity=quantity,
-                today=end_date
+                end_date=end_date
             )
         elif self.value_generator_type is ValueGeneratorType.SIMPLE_DB_BASED_VALUE:
             self.__value_generator = SimpleDBBasedValueGenerator()
@@ -419,13 +429,17 @@ class AlertData:
                  data_period_quantity: int,
                  data_period_unit: str,
                  hour_start: int,
-                 hour_end,
+                 hour_end: int,
                  last_check: datetime,
                  today: datetime):
+        print(self.__class__.__name__, " in creation ...")
         self.__hour_start = hour_start
         self.__hour_end = hour_end
 
-        self.__data_period_type = PeriodGeneratorType[data_period_type]
+        try:
+            self.__data_period_type = PeriodGeneratorType[data_period_type]
+        except KeyError:
+            raise EnumError(except_enum=PeriodGeneratorType, wrong_value=data_period_type, where=self.__class__.__name__)
 
         self.set_period_generator(
             last_check=last_check,
@@ -592,8 +606,10 @@ class AlertCalculator:
                  last_check: datetime,
                  today: datetime):
 
+        print(self.__class__.__name__, " in creation ...")
         self.__last_check = last_check
         self.__today = today
+        print(data_period_unit, type(data_period_unit))
 
         self.__acceptable_diff = acceptable_diff
 
@@ -605,10 +621,9 @@ class AlertCalculator:
 
         # COMPARATOR
         try:
-            self.__comparator = MyComparator(comparator)
+            self.__comparator = MyComparator[comparator]
         except ValueError:
-            raise EnumError(MyComparator, wrong_value=comparator)
-
+            raise EnumError(MyComparator, wrong_value=comparator, where=self.__class__.__name__)
 
 
         # ALERT DATA
@@ -629,7 +644,6 @@ class AlertCalculator:
         )
 
         self.check_non_coherent_config(value_type=value_type, value_period_type=value_period_type)
-
         self.__handle_alert_value_generator(
             today=today,
             value_period_type=value_period_type,
@@ -650,19 +664,19 @@ class AlertCalculator:
         def get_value_end_date():
             period_type: ValuePeriodType = ValuePeriodType[value_period_type]
             if period_type is ValuePeriodType.LAST_YEAR:
-                unit = PeriodUnitDefinition.YEAR
+                unit = PeriodUnitDefinition.YEAR.name
                 quantity = 1
             elif period_type is ValuePeriodType.LAST_DATA_PERIOD:
-                unit = data_period_unit,
+                unit = data_period_unit
                 quantity = data_period_quantity
                 # Go back data period time
             tmp_period = UserBasedGoBackPeriodGenerator(
                 to_date=today,
                 unit=unit,
-                quantity=quantity).get_pertinent_period()
+                quantity=quantity
+            ).get_pertinent_period()
             # Get startDate which will be new end date
             return tmp_period.get_start_date()
-
         end_date = get_value_end_date() if value_period_type else today
 
         self.__alert_value.set_value_generator(
