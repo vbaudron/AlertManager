@@ -5,13 +5,14 @@ from datetime import datetime, timedelta
 from unittest.mock import patch, MagicMock
 
 from model.alert import AlertDefinition, AlertDefinitionFlag, Level, MyOperator, MyComparator, PeriodUnitDefinition, \
-    PeriodDefinition, AlertCalculator, LastCheckBasedPeriodGenerator, PeriodGenerator, Period, UserBasedGoBackPeriodGenerator, \
+    PeriodDefinition, AlertCalculator, LastCheckBasedPeriodGenerator, PeriodGenerator, Period, \
+    UserBasedGoBackPeriodGenerator, \
     UserBasedValueGenerator, ValueGenerator, PeriodBasedValueGenerator, DataBaseValueGenerator, PeriodGeneratorType, \
     ValueGeneratorType, NoPeriodBasedValueGenerator, SimpleDBBasedValueGenerator, AlertData, AlertValue, \
-    AlertNotification, NotificationPeriod, Day, Hour, AlertManager
+    AlertNotification, NotificationPeriod, Day, Hour, AlertManager, ValuePeriodType
 
 from model.alert import AlertDefinitionStatus
-from model.my_exception import EnumError
+from model.my_exception import EnumError, ConfigError
 
 
 def generate_hours_flag(notification_hours: list):
@@ -135,12 +136,12 @@ class NotificationTest(unittest.TestCase):
         self.assertFalse(alert_notification.has_hour_in_notification_hours(not_to_have_hour))
 
         # Test in Multiples Flags
-        another_day_to_have = Hour.H_3
-        self.notification_hours = [to_have_hour, another_day_to_have]
+        another_hour_to_have = Hour.H_3
+        self.notification_hours = [to_have_hour, another_hour_to_have]
         alert_notification = self.get_alert_notification()
         self.assertTrue(alert_notification.has_hour_in_notification_hours(hour=to_have_hour))
         self.assertFalse(alert_notification.has_hour_in_notification_hours(hour=not_to_have_hour))
-        self.assertTrue(alert_notification.has_hour_in_notification_hours(hour=another_day_to_have))
+        self.assertTrue(alert_notification.has_hour_in_notification_hours(hour=another_hour_to_have))
 
         # ERROR : Not a Hour
         wrong_hour = "iam no hour"
@@ -333,101 +334,6 @@ class NotificationTest(unittest.TestCase):
                     datetime_to_check=today))
                 dt_mock.assert_called_with(datetime_to_check=today)
                 between_mock.assert_not_called()
-
-
-class AlertDefinitionTest(unittest.TestCase):
-
-    def setUp(self) -> None:
-        self.today = datetime.today()
-
-        self.name = "i am the name"
-        self.alert_definition_id = "id"
-        self.description = "i am supposed to describe the Alert definition"
-        self.category = "category"
-        self.level = Level.HIGH
-        self.status = AlertDefinitionStatus.INACTIVE
-        self.previous_notification = None
-        self.meter_ids = [1]
-
-        # Notification Part
-        self.notification_id = 1
-        self.notification_period_quantity = 1
-        self.notification_period_unit = NotificationPeriod.DAY
-        self.email = "test@test.com"
-        self.notification_days = [
-            Day.MONDAY, Day.TUESDAY
-        ]
-        self.notification_hours = [
-            Hour.H_1, Hour.H_2
-        ]
-
-        # Calculator Part
-
-        self.last_check = self.today - timedelta(days=2)
-
-
-    def generate_setup(self):
-        self.setup = {
-            "name": self.name,
-            "id": self.alert_definition_id,
-            "description": self.description,
-            "category": self.category,
-            "level": self.level.value,
-            "meter_ids": self.meter_ids,
-            "status": self.status.value,
-            "notification_id": self.notification_id,
-            "notification_period_quantity": self.notification_period_quantity,
-            "notification_period_unit": self.notification_period_unit.name,
-            "notification_email": self.email,
-            "notification_days": generate_days_flag(notification_days=self.notification_days),
-            "notification_hours": generate_hours_flag(notification_hours=self.notification_hours),
-            "calculator": {},
-        }
-
-    def get_alert_definition(self):
-        return AlertDefinition(
-            setup=self.setup,
-            last_check=self.last_check,
-            today=self.today)
-
-    def update_setup_and_get_alert_definition(self):
-        self.generate_setup()
-        return self.get_alert_definition()
-
-    def test__init(self):
-        self.definition_flags = [AlertDefinitionFlag.SAVE_ALL]
-        with patch("model.alert.AlertCalculator") as calculator_mock:
-            with patch("model.alert.AlertNotification") as notification_mock:
-                alert_definition = self.update_setup_and_get_alert_definition()
-                self.assertEqual(self.name, alert_definition.name)
-                self.assertEqual(self.alert_definition_id, alert_definition.id)
-                self.assertEqual(self.category, alert_definition.category_id)
-                self.assertEqual(self.description, alert_definition.description)
-                self.assertEqual(self.meter_ids, alert_definition.meter_ids)
-                calculator_mock.assert_called_with(setup=self.setup["calculator"], today=self.today, last_check=self.last_check)
-                notification_mock.assert_called_with(setup=self.setup["notification"])
-
-
-    # IS ACTIVE
-    def test__is_active(self):
-        self.definition_flags = [
-            AlertDefinitionFlag.NONE
-        ]
-        with patch("model.alert.AlertCalculator"):
-            with patch("model.alert.AlertNotification"):
-                alert_definition = self.update_setup_and_get_alert_definition()
-        alert_definition.add_definition_flag(AlertDefinitionFlag.NONE)
-        self.assertFalse(alert_definition.is_active)
-        alert_definition.add_definition_flag(AlertDefinitionStatus.ACTIVE)
-        self.assertTrue(alert_definition.is_active)
-
-    # LEVEL
-    def test__level(self):
-        self.level = Level.LOW
-        with patch("model.alert.AlertCalculator"):
-            with patch("model.alert.AlertNotification"):
-                alert_definition = self.update_setup_and_get_alert_definition()
-        self.assertTrue(alert_definition.level == Level.LOW)
 
 
 class MyOperatorTest(unittest.TestCase):
@@ -680,7 +586,7 @@ class PeriodGeneratorTest(unittest.TestCase):
 
     def test__user_based_period_generator(self):
 
-        quantity = 5,
+        quantity = 5
         unit = PeriodUnitDefinition.DAY.name
 
         expected_start = self.today - timedelta(days=quantity)
@@ -713,43 +619,79 @@ class ValueGeneratorTest(unittest.TestCase):
 
         self.assertEqual(user_based_value_generator.value, user_data)
 
-    def test__period_based_value_generator(self):
-        conn_info = {}
-        user_data = {
-            "quantity": 5,
-            "unit": PeriodUnitDefinition.DAY.value
-        }
-        today = datetime(year=2019, month=8, day=13)
+    def create_period_based_value_generator_instance(self):
+        return PeriodBasedValueGenerator(
+            operator=self.operator,
+            unit=self.unit,
+            quantity=self.quantity,
+            end_date=self.today
+        )
 
-        period_based_value_generator = PeriodBasedValueGenerator(conn_info=conn_info, user_data=user_data, today=today)
+
+    def test__period_based_value_generator(self):
+        self.quantity = 5
+        self.unit = PeriodUnitDefinition.DAY.name
+        self.operator = MyOperator.MAX
+
+        self.today = datetime(year=2019, month=8, day=13)
+
+        # -- INIT --
+
+        period_based_value_generator = self.create_period_based_value_generator_instance()
 
         self.assertIsInstance(period_based_value_generator, PeriodBasedValueGenerator)
         self.assertIsInstance(period_based_value_generator, DataBaseValueGenerator)
         self.assertIsInstance(period_based_value_generator, ValueGenerator)
 
         # -- GENERATE PERIOD --
+
         with patch("model.alert.PeriodBasedValueGenerator.generate_period") as mock:
-            period_based_value_generator = PeriodBasedValueGenerator(
-                conn_info=conn_info,
-                user_data=user_data,
-                today=today)
-            mock.assert_called_with(user_data=user_data, today=today)
+            self.create_period_based_value_generator_instance()
+            mock.assert_called_with(
+                unit=self.unit,
+                quantity=self.quantity,
+                end_date=self.today
+            )
 
         # Period Generator
-        with patch("model.alert.UserBasedPeriodGenerator") as mock:
-            period_based_value_generator = PeriodBasedValueGenerator(
-                conn_info=conn_info,
-                user_data=user_data,
-                today=today)
-            mock.assert_called_with(user_data=user_data, today=today)
+        with patch("model.alert.UserBasedGoBackPeriodGenerator") as mock:
+            self.create_period_based_value_generator_instance()
+            mock.assert_called_with(
+                unit=self.unit,
+                quantity=self.quantity,
+                to_date=self.today
+            )
 
         # Period
         with patch("model.alert.PeriodGenerator.get_pertinent_period") as mock:
-            period_based_value_generator = PeriodBasedValueGenerator(
-                conn_info=conn_info,
-                user_data=user_data,
-                today=today)
+            self.create_period_based_value_generator_instance()
             mock.assert_called()
+
+        # -- ERROR Cases --
+
+        # Error - unit empty
+        self.unit = None
+        with self.assertRaises(ConfigError):
+            self.create_period_based_value_generator_instance()
+
+        # Error - unit empty
+        self.unit = "Hello"
+        with self.assertRaises(EnumError):
+            self.create_period_based_value_generator_instance()
+
+        # Error - quantity None
+        self.quantity = None
+        self.unit = PeriodUnitDefinition.DAY.name
+        with self.assertRaises(ConfigError):
+            self.create_period_based_value_generator_instance()
+
+        # Error - quantity Negative
+        self.quantity = -5
+        self.unit = PeriodUnitDefinition.DAY.name
+        with self.assertRaises(ConfigError):
+            self.create_period_based_value_generator_instance()
+
+
 
 
 class AlertDataTest(unittest.TestCase):
@@ -763,60 +705,70 @@ class AlertDataTest(unittest.TestCase):
         self.period_unit = PeriodUnitDefinition.DAY
         self.period_quantity = 1
 
+        # Hours
+        self.hour_start = None
+        self.hour_end = None
+
         # datetime
         self.today = datetime(year=2019, month=8, day=13)
         self.last_check = datetime(year=2019, month=8, day=8)
 
-    def generate_setup(self):
-        # -- Data --
-        self.setup = {
-            "data_period_type": self.data_period_type.name
-        }
+    def get_alert_data(self):
+        quantity = self.period_quantity if self.data_period_type is PeriodGeneratorType.USER_BASED else None
+        unit = self.period_unit if self.data_period_type is PeriodGeneratorType.USER_BASED else None
+        data_period_type = self.data_period_type.name if isinstance(self.data_period_type, PeriodGeneratorType) else self.data_period_type
 
-        if self.data_period_type is PeriodGeneratorType.USER_BASED:
-            self.setup["data_period"] = {
-                "quantity": self.period_quantity,
-                "unit": self.period_unit.value
-            }
-
-    def update_and_get_new_alert_data(self):
-        self.generate_setup()
-        return self.generate_alert_data()
-
-    def generate_alert_data(self):
-        return AlertData(setup=self.setup, last_check=self.last_check, today=self.today)
+        return AlertData(
+            data_period_type=data_period_type,
+            data_period_quantity=quantity,
+            data_period_unit=unit,
+            last_check=self.last_check,
+            hour_start=self.hour_start,
+            hour_end=self.hour_end,
+            today=self.today
+        )
 
     def test__init(self):
-        alert_data: AlertData = self.update_and_get_new_alert_data()
+        alert_data: AlertData = self.get_alert_data()
 
         self.assertIsInstance(alert_data, AlertData)
 
         self.assertEqual(self.data_period_type, alert_data.data_period_type)
+
+        # Error
+        self.data_period_type = "IM_NOT_A_VALID_PERIOD_TYPE"
+        with self.assertRaises(EnumError):
+            self.get_alert_data()
+
 
     def test__data_period_generator(self):
         # -- LAST CHECK --
         # Instance created
         self.data_period_type = PeriodGeneratorType.LAST_CHECK
 
-        alert_data: AlertData = self.update_and_get_new_alert_data()
+        alert_data: AlertData = self.get_alert_data()
         self.assertIsInstance(alert_data.data_period_generator, LastCheckBasedPeriodGenerator)
 
         # Pertinent parameters
         with patch("model.alert.LastCheckBasedPeriodGenerator") as mock:
-            self.generate_alert_data()
+            self.get_alert_data()
             mock.assert_called_with(last_check=self.last_check, today=self.today)
 
         # -- USER BASED --
         # Instance created
         self.data_period_type = PeriodGeneratorType.USER_BASED
 
-        alert_data = self.update_and_get_new_alert_data()
+        alert_data = self.get_alert_data()
         self.assertIsInstance(alert_data.data_period_generator, UserBasedGoBackPeriodGenerator)
 
         # Pertinent parameters
-        with patch("model.alert.UserBasedPeriodGenerator") as mock:
-            self.generate_alert_data()
-            mock.assert_called_with(user_data=self.setup["data_period"], today=self.today)
+        with patch("model.alert.UserBasedGoBackPeriodGenerator") as mock:
+            self.get_alert_data()
+            mock.assert_called_with(
+                quantity=self.period_quantity,
+                unit=self.period_unit,
+                to_date=self.today
+            )
 
         # -- ERROR -- TODO
 
@@ -830,78 +782,86 @@ class AlertValueTest(unittest.TestCase):
         self.value_generator_type = ValueGeneratorType.PERIOD_BASED_VALUE
 
         # Period
-        self.period_unit = PeriodUnitDefinition.DAY
-        self.period_quantity = 1
+        self.value_period_type = None
 
         # datetime
         self.today = datetime(year=2019, month=8, day=13)
 
-    def generate_setup(self):
-        # -- Value --
-        self.setup = {
-            "value_number": self.value_number,
-            "value_type": self.value_generator_type.name
-        }
-
-        if self.value_generator_type is ValueGeneratorType.PERIOD_BASED_VALUE:
-            self.setup["value_period"] = {
-                "quantity": self.period_quantity,
-                "unit": self.period_unit.value
-            }
-
-    def update_and_get_new_alert_value(self):
-        self.generate_setup()
-        return self.generate_alert_value()
-
-    def generate_alert_value(self):
-        return AlertValue(setup=self.setup, today=self.today)
+    def get_alert_value(self):
+        return AlertValue(
+            value_type=self.value_generator_type.name,
+            value_number=self.value_number
+        )
 
     def test__init(self):
-        alert_value: AlertValue = self.update_and_get_new_alert_value()
+        alert_value: AlertValue = self.get_alert_value()
 
         self.assertIsInstance(alert_value, AlertValue)
 
         self.assertEqual(self.value_number, alert_value.value_number)
         self.assertEqual(self.value_generator_type, alert_value.value_generator_type)
 
+    def get_alert_data_and_set_value_generator(self):
+        alert_value: AlertValue = self.get_alert_value()
+        alert_value.set_value_generator(
+            end_date=self.end_date,
+            unit=self.unit.name,
+            quantity=self.quantity,
+            operator=self.operator
+        )
+        return alert_value
+
     def test__value_generator(self):
         # -- SIMPLE DB --
         # Instance created
+        self.end_date = datetime.today()
+        self.unit = PeriodUnitDefinition.DAY
+        self.quantity = 2
+        self.operator = MyOperator.MAX
+
         self.value_generator_type = ValueGeneratorType.SIMPLE_DB_BASED_VALUE
 
-        alert_value: AlertValue = self.update_and_get_new_alert_value()
+        alert_value: AlertValue = self.get_alert_data_and_set_value_generator()
         self.assertIsInstance(alert_value.value_generator, SimpleDBBasedValueGenerator)
 
         # Pertinent parameters
         with patch("model.alert.SimpleDBBasedValueGenerator") as mock:
-            self.generate_alert_value()
-            mock.assert_called_with(conn_info={})
+            self.get_alert_data_and_set_value_generator()
+            mock.assert_called_with()
 
         # -- PERIOD BASED VALUE --
         # Instance created
         self.value_generator_type = ValueGeneratorType.PERIOD_BASED_VALUE
 
-        alert_value = self.update_and_get_new_alert_value()
+        alert_value = self.get_alert_data_and_set_value_generator()
         self.assertIsInstance(alert_value.value_generator, PeriodBasedValueGenerator)
 
         # Pertinent parameters
         with patch("model.alert.PeriodBasedValueGenerator") as mock:
-            self.generate_alert_value()
-            mock.assert_called_with(conn_info={}, user_data=self.setup["value_period"], today=self.today)
+            self.get_alert_data_and_set_value_generator()
+            mock.assert_called_with(
+                operator=self.operator,
+                unit=self.unit.name,
+                quantity=self.quantity,
+                end_date=self.end_date
+            )
 
         # -- USER BASED VALUE --
         # Instance created
         self.value_generator_type = ValueGeneratorType.USER_BASED_VALUE
 
-        alert_value = self.update_and_get_new_alert_value()
+        alert_value = self.get_alert_data_and_set_value_generator()
         self.assertIsInstance(alert_value.value_generator, NoPeriodBasedValueGenerator)
 
         # Pertinent parameters
         with patch("model.alert.NoPeriodBasedValueGenerator") as mock:
-            self.generate_alert_value()
+            self.get_alert_data_and_set_value_generator()
             mock.assert_called_with(value=self.value_number)
 
         # -- ERROR -- TODO
+
+    def test__value_period_type(self):
+        pass  # TODO
 
 
 class AlertCalculatorTest(unittest.TestCase):
@@ -914,19 +874,20 @@ class AlertCalculatorTest(unittest.TestCase):
         self.comparator = MyComparator.SUP
         self.acceptable_diff = True
 
-        # data
+        # -- DATA --
         self.data_period_type = PeriodGeneratorType.USER_BASED
+        # Period
+        self.data_period_unit = PeriodUnitDefinition.DAY
+        self.data_period_quantity = 1
+        # Hours
+        self.hour_start = None
+        self.hour_end = None
 
-        # value
+        # -- VALUE --
         self.value_number = 15
         self.value_generator_type = ValueGeneratorType.PERIOD_BASED_VALUE
-
         # Period
-        self.period_unit = PeriodUnitDefinition.DAY
-        self.period_quantity = 1
-
-        # -- Generate setup --
-        self.generate_setup()
+        self.value_period_type = ValuePeriodType.LAST_DATA_PERIOD
 
         # -- RESULT --
         self.data = None
@@ -936,81 +897,192 @@ class AlertCalculatorTest(unittest.TestCase):
         self.today = datetime(year=2019, month=8, day=13)
         self.last_check = datetime(year=2019, month=8, day=8)
 
-    def generate_setup(self):
-        # -- Data --
-        self.data_setup = {
-            "data_period_type": self.data_period_type.name
-        }
-
-        if self.data_period_type is PeriodGeneratorType.USER_BASED:
-            self.data_setup["data_period"] = {
-                "quantity": self.period_quantity,
-                "unit": self.period_unit.value
-            }
-
-        # -- Value --
-        self.value_setup = {
-            "value_number": self.value_number,
-            "value_type": self.value_generator_type.name
-        }
-
-        if self.value_generator_type is ValueGeneratorType.PERIOD_BASED_VALUE:
-            self.value_setup["value_period"] = {
-                "quantity": self.period_quantity,
-                "unit": self.period_unit.value
-            }
-
-        # -- SETUP --
-        self.setup = {
-            "data": self.data_setup,
-            "value": self.value_setup,
-            "operator": self.operator.value,
-            "acceptable_diff": self.acceptable_diff,
-            "comparator": self.comparator.value
-        }
 
     def get_alert_calculator(self) -> AlertCalculator:
         return AlertCalculator(
-            setup=self.setup,
+            operator=self.operator.name,
+            comparator=self.comparator.name,
+            data_period_type=self.data_period_type.name,
+            data_period_quantity=self.data_period_quantity,
+            data_period_unit=self.data_period_unit.name,
+            value_type=self.value_generator_type.name,
+            value_number=self.value_number,
+            value_period_type=self.value_period_type if not isinstance(self.value_period_type, ValuePeriodType) else self.value_period_type.name,
+            hour_start=self.hour_start,
+            hour_end=self.hour_end,
+            acceptable_diff=self.acceptable_diff,
             last_check=self.last_check,
             today=self.today
         )
 
-    def update_and_get_new_alert_calculator(self) -> AlertCalculator:
-        self.generate_setup()
-        return self.get_alert_calculator()
-
     def test__init(self):
-        alert_calculator = self.update_and_get_new_alert_calculator()
 
-        self.assertIsInstance(alert_calculator, AlertCalculator)
+        print("______________________ MOCKED TEST")
 
-        # assert Attributes
-        self.assertEqual(self.setup, alert_calculator.setup)
-        self.assertEqual(self.operator, alert_calculator.operator)
-        self.assertEqual(self.comparator, alert_calculator.comparator)
-        self.assertEqual(self.acceptable_diff, alert_calculator.acceptable_diff)
-        # datetime
-        self.assertEqual(self.today, alert_calculator.today)
-        self.assertEqual(self.last_check, alert_calculator.last_check)
-        # data
-        self.assertIsInstance(alert_calculator.alert_data, AlertData)
-        # value
-        self.assertIsInstance(alert_calculator.alert_value, AlertValue)
-
-        # -- Pertinent parameters --
-
-        # data
-        with patch("model.alert.AlertData") as mock:
-            self.get_alert_calculator()
-            mock.assert_called_with(setup=self.setup["data"], last_check=self.last_check, today=self.today)
-
-        # value
-        with patch("model.alert.AlertValue") as mock:
-            self.get_alert_calculator()
-            mock.assert_called_with(setup=self.setup["value"], today=self.today)
+        with patch("model.alert.AlertData") as data_mock:
+            with patch("model.alert.AlertValue") as value_mock:
+                alert_calculator = self.get_alert_calculator()
+                self.assertIsInstance(alert_calculator, AlertCalculator)
+                self.assertEqual(self.operator, alert_calculator.operator)
+                self.assertEqual(self.comparator, alert_calculator.comparator)
+                self.assertEqual(self.acceptable_diff, alert_calculator.acceptable_diff)
+                self.assertEqual(self.today, alert_calculator.today)
+                self.assertEqual(self.last_check, alert_calculator.last_check)
+                self.get_alert_calculator()
+                data_mock.assert_called_with(
+                    data_period_type=self.data_period_type.name,
+                    data_period_quantity=self.data_period_quantity,
+                    data_period_unit=self.data_period_unit.name,
+                    last_check=self.last_check,
+                    hour_start=self.hour_start,
+                    hour_end=self.hour_end,
+                    today=self.today
+                )
+                value_mock.assert_called_with(
+                    value_type=self.value_generator_type.name,
+                    value_number=self.value_number
+                )
 
         # -- ERROR -- TODO
+
+
+
+class AlertDefinitionTest(unittest.TestCase):
+
+    def setUp(self) -> None:
+        self.today = datetime.today()
+
+        self.name = "i am the name"
+        self.alert_definition_id = "id"
+        self.description = "i am supposed to describe the Alert definition"
+        self.category = "category"
+        self.level = Level.HIGH
+        self.status = AlertDefinitionStatus.INACTIVE
+        self.previous_notification = None
+        self.meter_ids = [1]
+
+        # Notification Part
+        self.notification_id = 1
+        self.notification_period_quantity = 1
+        self.notification_period_unit = NotificationPeriod.DAY
+        self.email = "test@test.com"
+        self.notification_days = [
+            Day.MONDAY, Day.TUESDAY
+        ]
+        self.notification_hours = [
+            Hour.H_1, Hour.H_2
+        ]
+
+        # Calculator Part
+        self.operator = MyOperator.MAX
+        self.comparator = MyComparator.SUP
+        self.acceptable_diff = True
+        # data
+        self.data_period_type = PeriodGeneratorType.USER_BASED
+        self.data_period_unit = PeriodUnitDefinition.DAY
+        self.data_period_quantity = 1
+        self.hour_start = None
+        self.hour_end = None
+        # value
+        self.value_number = 15
+        self.value_type = ValueGeneratorType.PERIOD_BASED_VALUE
+        self.value_period_type = ValuePeriodType.LAST_DATA_PERIOD
+
+        self.last_check = self.today - timedelta(days=2)
+
+
+    def generate_setup(self):
+        self.setup = {
+            "name": self.name,
+            "id": self.alert_definition_id,
+            "description": self.description,
+            "category": self.category,
+            "level": self.level.value,
+            "meter_ids": self.meter_ids,
+            "status": self.status.value,
+            "notification_id": self.notification_id,
+            "notification_period_quantity": self.notification_period_quantity,
+            "notification_period_unit": self.notification_period_unit.name,
+            "notification_email": self.email,
+            "notification_days": generate_days_flag(notification_days=self.notification_days),
+            "notification_hours": generate_hours_flag(notification_hours=self.notification_hours),
+            "operator": self.operator.name,
+            "comparator": self.comparator.name,
+            "data_period_type": self.data_period_type.name,
+            "data_period_quantity": self.data_period_quantity,
+            "data_period_unit": self.data_period_unit.name,
+            "value_type": self.value_type.name,
+            "value_number": self.value_number,
+            "value_period_type": self.value_period_type.name,
+            "acceptable_diff": self.acceptable_diff,
+            "hour_start": self.hour_start,
+            "hour_end": self.hour_end,
+        }
+
+    def get_alert_definition(self):
+        return AlertDefinition(
+            setup=self.setup,
+            last_check=self.last_check,
+            today=self.today)
+
+    def update_setup_and_get_alert_definition(self):
+        self.generate_setup()
+        return self.get_alert_definition()
+
+    def test__init(self):
+        with patch("model.alert.AlertCalculator") as calculator_mock:
+            with patch("model.alert.AlertNotification") as notification_mock:
+                alert_definition = self.update_setup_and_get_alert_definition()
+                self.assertEqual(self.name, alert_definition.name)
+                self.assertEqual(self.alert_definition_id, alert_definition.id)
+                self.assertEqual(self.category, alert_definition.category_id)
+                self.assertEqual(self.description, alert_definition.description)
+                self.assertEqual(self.meter_ids, alert_definition.meter_ids)
+                calculator_mock.assert_called_with(
+                    operator=self.operator.name,
+                    comparator=self.comparator.name,
+                    data_period_type=self.data_period_type.name,
+                    data_period_quantity=self.data_period_quantity,
+                    data_period_unit=self.data_period_unit.name,
+                    value_type=self.value_type.name,
+                    value_number=self.value_number,
+                    value_period_type=self.value_period_type.name,
+                    hour_start=self.hour_start,
+                    hour_end=self.hour_end,
+                    acceptable_diff=self.acceptable_diff,
+                    today=self.today,
+                    last_check=self.last_check
+                )
+                notification_mock.assert_called_with(
+                    notification_id=self.notification_id,
+                    period_unit=self.notification_period_unit.name,
+                    period_quantity=self.notification_period_quantity,
+                    email=self.email,
+                    days=generate_days_flag(notification_days=self.notification_days),
+                    hours=generate_hours_flag(notification_hours=self.notification_hours)
+                )
+
+
+    # IS ACTIVE
+    def test__is_active(self):
+        self.status = AlertDefinitionStatus.INACTIVE
+        with patch("model.alert.AlertCalculator"):
+            with patch("model.alert.AlertNotification"):
+                alert_definition = self.update_setup_and_get_alert_definition()
+                self.assertFalse(alert_definition.is_active)
+                self.status = AlertDefinitionStatus.ACTIVE
+                alert_definition = self.update_setup_and_get_alert_definition()
+                self.assertTrue(alert_definition.is_active)
+
+    # LEVEL
+    def test__level(self):
+        self.level = Level.LOW
+        with patch("model.alert.AlertCalculator"):
+            with patch("model.alert.AlertNotification"):
+                alert_definition = self.update_setup_and_get_alert_definition()
+                self.assertTrue(alert_definition.level == Level.LOW)
+
+
 
 
 class AlertManager(unittest.TestCase):
@@ -1018,8 +1090,7 @@ class AlertManager(unittest.TestCase):
     alert_manager: AlertManager
 
     def test__init(self):
-        self.alert_manager = AlertManager()
-        self.assertEqual(1, len(self.alert_manager.alert_definition_list))
+       pass  # TODO
 
 
 

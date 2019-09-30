@@ -71,7 +71,7 @@ def get_file_last_modification_time(file_path_name: str) -> datetime:
 def enum_str_values(enum: Enum) -> "Str of each member of the enum":
     my_str = ""
     for name, member in enum.__members__.items():
-        my_str += "'{0}' : {1}    ".format(name, member.value)
+        my_str += "'{0}' : {1}    ".format(name, str(member.value))
     return my_str
 
 
