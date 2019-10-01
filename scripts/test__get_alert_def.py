@@ -1,5 +1,5 @@
-from model.alert import AlertDefinitionStatus
-from model.utils import DEFINITION_TABLE_NAME, my_sql
+from model.alert import AlertDefinitionStatus, my_sql
+from model.utils import DEFINITION_TABLE_NAME
 
 QUERY = "select d.*, n.*, c.*, dm.meter_id from alert_definition d, alert_notification n, alert_calculator c, alert_definition_meter dm WHERE d.status=1 INNER JOIN d.id="
 

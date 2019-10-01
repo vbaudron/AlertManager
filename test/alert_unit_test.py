@@ -4,7 +4,7 @@ import unittest
 from datetime import datetime, timedelta
 from unittest.mock import patch, MagicMock
 
-from model.alert import AlertDefinition, AlertDefinitionFlag, Level, MyOperator, MyComparator, PeriodUnitDefinition, \
+from model.alert import AlertDefinition, Level, MyOperator, MyComparator, PeriodUnitDefinition, \
     PeriodDefinition, AlertCalculator, LastCheckBasedPeriodGenerator, PeriodGenerator, Period, \
     UserBasedGoBackPeriodGenerator, \
     UserBasedValueGenerator, ValueGenerator, PeriodBasedValueGenerator, DataBaseValueGenerator, PeriodGeneratorType, \
@@ -13,20 +13,7 @@ from model.alert import AlertDefinition, AlertDefinitionFlag, Level, MyOperator,
 
 from model.alert import AlertDefinitionStatus
 from model.my_exception import EnumError, ConfigError
-
-
-def generate_hours_flag(notification_hours: list):
-    hours = 0
-    for hour in notification_hours:
-        hours |= hour.value
-    return hours
-
-
-def generate_days_flag(notification_days: list):
-    days = 0
-    for day in notification_days:
-        days |= day.value
-    return days
+from model.utils import generate_hours_flag, generate_days_flag
 
 
 class NotificationTest(unittest.TestCase):
@@ -692,8 +679,6 @@ class ValueGeneratorTest(unittest.TestCase):
             self.create_period_based_value_generator_instance()
 
 
-
-
 class AlertDataTest(unittest.TestCase):
 
     def setUp(self) -> None:
@@ -946,14 +931,13 @@ class AlertCalculatorTest(unittest.TestCase):
         # -- ERROR -- TODO
 
 
-
 class AlertDefinitionTest(unittest.TestCase):
 
     def setUp(self) -> None:
         self.today = datetime.today()
 
         self.name = "i am the name"
-        self.alert_definition_id = "id"
+        self.alert_definition_id = 1
         self.description = "i am supposed to describe the Alert definition"
         self.category = "category"
         self.level = Level.HIGH
@@ -1081,8 +1065,6 @@ class AlertDefinitionTest(unittest.TestCase):
             with patch("model.alert.AlertNotification"):
                 alert_definition = self.update_setup_and_get_alert_definition()
                 self.assertTrue(alert_definition.level == Level.LOW)
-
-
 
 
 class AlertManager(unittest.TestCase):

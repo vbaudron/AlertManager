@@ -5,7 +5,7 @@ from model.utils import TableToGenerate, ALERT_TABLE_NAME, ALERT_FOREIGN_KEY, AL
     ALERT_DEFINITION_NOTIFICATION_TIME_FOREIGN_KEY, ALERT_MANAGER_TABLE_NAME, ALERT_MANAGER_TABLE_COMPO
 
 # NOTIFICATION
-notification_table = TableToGenerate(
+alert_notification_table = TableToGenerate(
     table_name=NOTIFICATION_NAME,
     compo=NOTIFICATION_COMPO,
     foreign_keys=None
@@ -13,7 +13,7 @@ notification_table = TableToGenerate(
 
 
 # CALCULATOR
-calculator_table = TableToGenerate(
+alert_calculator_table = TableToGenerate(
     table_name=CALCULATOR_NAME,
     compo=CALCULATOR_COMPO,
     foreign_keys=None
@@ -21,21 +21,21 @@ calculator_table = TableToGenerate(
 
 
 # DEFINITION
-definition_table = TableToGenerate(
+alert_definition_table = TableToGenerate(
     table_name=DEFINITION_TABLE_NAME,
     compo=DEFINITION_COMPO,
     foreign_keys=DEFINITON_ALERT_FOREIGN_KEY
 )
 
 # ALERT
-alert_table = TableToGenerate(
+alert_alert_table = TableToGenerate(
     table_name=ALERT_TABLE_NAME,
     compo=ALERT_TABLE_COMPO,
     foreign_keys=ALERT_FOREIGN_KEY
 )
 
 # ALERT_DEFINITION METER
-definition_meter_table = TableToGenerate(
+alert_definition_meter_table = TableToGenerate(
     table_name=METER_DEFINITIONS_ALERT_TABLE_NAME,
     compo=METER_DEFINITION_COMPO,
     foreign_keys=METER_DEFINITION_ALERT_FOREIGN_KEY
@@ -43,37 +43,37 @@ definition_meter_table = TableToGenerate(
 
 # ALERT_DEFINITION NOTIFICATION TIME
 
-definition_notification_table = TableToGenerate(
+alert_definition_notification_table = TableToGenerate(
     table_name=ALERT_DEFINITION_NOTIFICATION_TIME,
     compo=ALERT_DEFINITION_NOTIFICATION_TIME_COMPO,
     foreign_keys=ALERT_DEFINITION_NOTIFICATION_TIME_FOREIGN_KEY
 )
 
-manager_table = TableToGenerate(
+alert_manager_table = TableToGenerate(
     table_name=ALERT_MANAGER_TABLE_NAME,
     compo=ALERT_MANAGER_TABLE_COMPO
 )
 
 
 # CREATE TABLES
-def create_tables():
+def create_alert_related_tables():
     tables = [
-        notification_table,
-        calculator_table,
-        definition_table,
-        alert_table,
-        definition_meter_table,
-        definition_notification_table,
-        manager_table
+        alert_notification_table,
+        alert_calculator_table,
+        alert_definition_table,
+        alert_alert_table,
+        alert_definition_meter_table,
+        alert_definition_notification_table,
+        alert_manager_table
     ]
 
     for table in tables:
-        print(table, " start creation ...")
+        print("\n", table, " start creation ... ")
         table.request_table_creation()
 
 
 # CREATE TABLES
 if __name__ == '__main__':
-    create_tables()
+    create_alert_related_tables()
 
 
