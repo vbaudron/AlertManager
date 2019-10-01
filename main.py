@@ -5,12 +5,13 @@ from os.path import join, isfile
 from model import alert
 
 scripts_folder_name = "scripts"
+tests_folder_name = "test"
 
 
-def get_script_files():
+def get_folder_files(folder_name: str):
     try:
         file_names = [
-            join(scripts_folder_name, f) for f in listdir(scripts_folder_name) if isfile(join(scripts_folder_name, f))
+            join(folder_name, f) for f in listdir(folder_name) if isfile(join(folder_name, f))
         ]
         return file_names
     except Exception as e:
@@ -18,10 +19,10 @@ def get_script_files():
         return None
 
 
-def launch_script(globals=None):
-    scripts = get_script_files()
+def launch_script(folder_name, globals=None):
+    files = get_folder_files(folder_name=folder_name)
     for param in sys.argv:
-        if param in scripts:
+        if param in files:
             print("==>  |", param, "FOUND |  <==")
             file_name = param.split("/")[1]
             print(file_name)
@@ -38,8 +39,11 @@ def launch_script(globals=None):
 
 if __name__ == '__main__':
     print(sys.argv)
+
     if len(sys.argv) > 1:
-        launch_script()
+        folder = sys.argv[1].split("/")[0]
+        print("FOLDER found :", folder)
+        launch_script(folder_name=folder)
     else:
         print("go alert")
         alert.startAlertScript()

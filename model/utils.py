@@ -10,6 +10,8 @@ from mysql.connector import MySQLConnection
 
 from definition import ROOT_DIR
 
+
+
 # _______________________________________________ PATH _________________________________________________________________
 
 # Folder Name
@@ -80,8 +82,9 @@ def enum_str_values(enum: Enum) -> "Str of each member of the enum":
 
 
 class MySqlConnection:
-
+    TEST_MODE = False
     FILENAME = "mysql_config.json"
+    FILENAME_TEST = "mysql_config_test.json"
 
     __host: str
     __username: str
@@ -95,18 +98,22 @@ class MySqlConnection:
 
     def __init__(self) -> None:
         super().__init__()
-        self.__update_connection_info()
+        self.__open_time = None
         self.__connection = None
 
-    # CONFIG
+        # CONFIG
     def update_open_time(self):
         self.__open_time = datetime.datetime.today()
 
-    def get_file_path(self):
-        return get_path_in_data_folder_of(MySqlConnection.FILENAME)
+    @staticmethod
+    def get_file_path():
+        if not MySqlConnection.TEST_MODE:
+            return get_path_in_data_folder_of(MySqlConnection.FILENAME)
+        else:
+            return get_path_in_data_folder_of(MySqlConnection.FILENAME_TEST)
 
     def update_file_if_needed(self) -> bool:
-        if self.open_time.timestamp() < get_file_last_modification_time(self.get_file_path()):
+        if not self.open_time or self.open_time.timestamp() < get_file_last_modification_time(self.get_file_path()):
             self.__update_connection_info()
             return True
         return False
@@ -119,6 +126,17 @@ class MySqlConnection:
         self.__password = setup["password"]
         self.__database = setup["database"]
         self.__port = setup["port"]
+
+    def connect_without_database(self):
+        self.update_file_if_needed()
+        self.__connection = MySQLConnection(
+            host=self.host,
+            user=self.username,
+            password=self.password,
+            port=self.__port
+        )
+        print("connected without database")
+
 
     # CONNECTION
     def __connect(self):
@@ -138,11 +156,16 @@ class MySqlConnection:
             self.__connect()
         return self.__connection.cursor()
 
-    def execute_and_close(self, query: str, params=None):
+    def execute_and_close(self, query: str, params=None, return_id=False):
         my_cursor = self.generate_cursor()
         my_cursor.execute(operation=query, params=params)
         my_sql.commit()
-        my_cursor.close()
+        if return_id:
+            my_id = my_cursor.lastrowid
+            my_cursor.close()
+            return my_id
+        else:
+            my_cursor.close()
 
     def commit(self):
         self.__connection.commit()
@@ -181,10 +204,7 @@ def iter_row(cursor, size=10):
             yield row
 
 # -------------------------- #   MySQL Connection   # -------------------------- #
-
 my_sql = MySqlConnection()
-
-
 # -------------------------- #     ABSTRACT Table Creation     # -------------------------- #
 
 class TableToGenerate:
@@ -226,7 +246,6 @@ class TableToGenerate:
                 my_format += ", "
                 my_format += key
         my_format += ")"
-        print(my_format)
         return my_format
 
     def request_table_creation(self):
@@ -238,6 +257,11 @@ class TableToGenerate:
 
     def __str__(self):
         return self.__table_name + " table"
+
+
+    @property
+    def name(self):
+        return self.__table_name
 
     # CHECK
     @staticmethod
@@ -262,6 +286,12 @@ class TableToGenerate:
         else:
             log.error("{} table does NOT exist".format(table_name))
             return False
+
+    @staticmethod
+    def drop_table(table_name: str):
+        query = "DROP TABLES {}".format(table_name)
+        my_sql.execute_and_close(query=query)
+
 
 
 # _______________________________________________ Table Creation _______________________________________________________
@@ -378,10 +408,6 @@ ALERT_MANAGER_TABLE_COMPO = {
 # ______________________________________________________________________________________________________________________
 
 
-if __name__ == '__main__':
-    pass
-
-
 def insert_query_construction(compo, name):
     # PARAMS
     params_list = list(key for key in compo.keys())
@@ -395,3 +421,17 @@ def insert_query_construction(compo, name):
     query = "INSERT INTO {} ({}) VALUES ({})".format(name, params_str, format_param)
     print(query)
     return query
+
+
+def generate_hours_flag(notification_hours: list):
+    hours = 0
+    for hour in notification_hours:
+        hours |= hour.value
+    return hours
+
+
+def generate_days_flag(notification_days: list):
+    days = 0
+    for day in notification_days:
+        days |= day.value
+    return days

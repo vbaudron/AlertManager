@@ -18,10 +18,11 @@ from mysql.connector.cursor import MySQLCursor
 from model import utils
 from model.my_exception import EnumError, ConfigError, NoDataFoundInDatabase, StopCheckAlertDefinition
 from model.utils import get_day_name_from_datetime, get_data_from_json_file, get_str_from_file, \
-    get_path_in_data_folder_of, my_sql, ALERT_TABLE_NAME, ALERT_TABLE_COMPO, \
+    get_path_in_data_folder_of, ALERT_TABLE_NAME, ALERT_TABLE_COMPO, \
     SOURCE_PATH, iter_row, METER_TABLE_NAME, NOTIFICATION_NAME, ALERT_MANAGER_TABLE_NAME, get_path_in_source_folder_of, \
-    ALERT_DEFINITION_NOTIFICATION_TIME, ALERT_DEFINITION_NOTIFICATION_TIME_COMPO
+    ALERT_DEFINITION_NOTIFICATION_TIME, ALERT_DEFINITION_NOTIFICATION_TIME_COMPO, my_sql
 from enum import Enum, auto, unique, Flag, IntEnum
+
 
 
 # ---------------------------------------------------   OPERATOR   -----------------------------------------------------
@@ -95,6 +96,8 @@ class MyComparator(Enum):
 
 # -------------------------------------------------   PERIOD Class   ---------------------------------------------------
 
+def go_past_with_hours(end_date: datetime, quantity: int) -> datetime:
+    return end_date - timedelta(hours=quantity)
 
 def go_past_with_days(end_date: datetime, quantity: int) -> datetime:
     return end_date - timedelta(days=quantity)
@@ -134,6 +137,7 @@ class PeriodUnitDefinition(Enum):
        value : represent the String associated to the period - it is the KEY in json file
        go_past : it is the method associated to calculate the start date from the end_date
    """
+    HOUR = "HOUR", go_past_with_hours, 1
     DAY = "DAY", go_past_with_days, 24
     WEEK = "WEEK", go_past_with_weeks, 7 * 24
     MONTH = "MONTH", go_past_with_months, 30 * 24
@@ -1392,7 +1396,7 @@ class AlertManager:
     def save(self):
         print("\n\nALERT MANAGER *** SAVE ***")
 
-        query = "INSERT INTO {} (launch_time) VALUES (%s)".format(ALERT_MANAGER_TABLE_NAME)
+        query = "INSERT INTO {} (launch_datetime) VALUES (%s)".format(ALERT_MANAGER_TABLE_NAME)
         params = [self.__today]
 
         print("query", query)
@@ -1402,7 +1406,7 @@ class AlertManager:
 
     @staticmethod
     def get_last_check_from_db():
-        query = """SELECT launch_time from {} ORDER BY launch_time DESC LIMIT 1""".format(ALERT_MANAGER_TABLE_NAME)
+        query = """SELECT launch_datetime from {} ORDER BY launch_datetime DESC LIMIT 1""".format(ALERT_MANAGER_TABLE_NAME)
         cursor = my_sql.generate_cursor()
         cursor.execute(operation=query)
         result = cursor.fetchall()
@@ -1471,3 +1475,5 @@ class AlertManager:
 
 def startAlertScript():
     AlertManager.start()
+
+

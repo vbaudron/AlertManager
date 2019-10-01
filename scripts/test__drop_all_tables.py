@@ -1,4 +1,6 @@
-from model.utils import TableToGenerate, my_sql
+from model.utils import TableToGenerate
+from model.alert import my_sql
+
 
 def __get_query():
     tables = TableToGenerate.show_tables_request()
