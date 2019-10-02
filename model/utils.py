@@ -306,7 +306,7 @@ NOTIFICATION_COMPO = {
     "id": "INT AUTO_INCREMENT PRIMARY KEY",
     "period_unit": "VARCHAR(8) NOT NULL",
     "period_quantity": "INT NOT NULL",
-    "email": "VARCHAR(255)",
+    "email": "VARCHAR(255) NOT NULL",
     "days_flag": "INT NOT NULL DEFAULT 0",
     "hours_flag": "INT NOT NULL DEFAULT 0"
 }

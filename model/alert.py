@@ -13,6 +13,7 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from typing import Any, Union
 
+from mailjet_rest import Client
 from mysql.connector.cursor import MySQLCursor
 
 from model import utils
@@ -527,6 +528,7 @@ class HandleDataFromDB:
 
     def __get_query_result(self, meter_id: int, time_needed: bool):
         cursor = my_sql.generate_cursor()
+        print("Time needed :", time_needed)
 
         query = HandleDataFromDB.generate_query(time_needed=time_needed)
         params = (
@@ -542,7 +544,10 @@ class HandleDataFromDB:
 
         result = list()
         for row in iter_row(cursor, 10):
-            result.append(row[0])
+            if time_needed:
+                result.append(row)
+            else:
+                result.append(row[0])
 
         print("result :", result)
 
@@ -919,7 +924,9 @@ class AlertNotification:
         # Get day divided by nb_day in period (equivalent values)
         count = delta.days / self.period.value
 
-        return count >= self.number
+        is_enough = count >= self.number
+        print("enough time between ?", is_enough)
+        return is_enough
 
     # [IS_ALLOWED] Datetime
     def is_notification_allowed_for_datetime(self, datetime_to_check: datetime):
@@ -1011,7 +1018,12 @@ class AlertNotification:
 
 class Email:
     TEMPLATE_FOLDER_NAME = "template"
-    PASSWORD = "password"
+    SMTP_CONFIG = {
+      "username": "1b92e8fd0f416790a3d64d6e3ba632a9",
+      "password": "e3da3d255860284e810bc07d713dbc9c",
+      "server": "in-v3.mailjet.com",
+      "port": 465
+    }
 
     __sender_email: str
     __receiver_email: str
@@ -1031,30 +1043,33 @@ class Email:
 
     def generate_template(self, replacements: dict):
         for key, value in replacements.items():
-            self.email_content.replace("{{" + key + "}}", value)
-
+            self.__email_content = self.email_content.replace("{{" + key + "}}", value)
 
     def send(self, receiver_email: str):
         self.__receiver_email = receiver_email
-        self.__message = MIMEMultipart("alternative")
-        self.__message["Subject"] = self.subject
-        self.__message["From"] = self.sender_email
-        self.__message["To"] = self.receiver_email
-
-        html = MIMEText(self.email_content, "html")
-        self.__message.attach(html)
-
-        try:
-            with smtplib.SMTP("localhost", port=8025) as connection:
- #               import pdb;pdb.set_trace()
-
-                connection.send_message(from_addr=self.sender_email, to_addrs=self.receiver_email, msg=self.__message)
-             #   connection.sendmail(from_addr=self.sender_email, to_addrs=self.receiver_email, msg=self.__message.as_string())
-                print("mail send to", self.receiver_email)
-                return True
-        except Exception as error:
-            log.error(error)
-            return False
+        mailjet = Client(auth=(Email.SMTP_CONFIG["username"], Email.SMTP_CONFIG["password"]), version='v3.1')
+        data = {
+            'Messages': [
+                {
+                    "From": {
+                        "Email": self.__sender_email
+                    },
+                    "To": [
+                        {
+                            "Email": self.receiver_email
+                        }
+                    ],
+                    "Subject": self.__subject,
+                    "HTMLPart": self.__email_content
+                }
+            ]
+        }
+        result = mailjet.send.create(data=data)
+        if result.status_code == 200:
+            return True
+        else:
+            log.error("email not send. Status code :", result.status_code, "details :", result.json())
+        print(result.json())
 
     def email_config_path(self, filename: str):
         config_path = get_path_in_data_folder_of(filename)

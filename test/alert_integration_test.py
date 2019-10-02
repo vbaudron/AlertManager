@@ -31,6 +31,7 @@ class MyIntegrationTest(ABC):
         self.__use_db()
 
         self._tests = self.set_tests_to_run()
+        self.create_tables()
 
     def start(self):
         for test in self._tests:
@@ -51,6 +52,10 @@ class MyIntegrationTest(ABC):
 
     def set_up_test(self):
         pass
+
+    @abstractmethod
+    def create_tables(self):
+        raise NotImplementedError
 
     # DATABASE - CREATION & DESTRUCTION
 
@@ -94,7 +99,6 @@ class AlertManagerTest(MyIntegrationTest):
 
     def __init__(self):
         super().__init__()
-        self.create_tables()
 
         self.today = datetime.today()
 
@@ -111,7 +115,7 @@ class AlertManagerTest(MyIntegrationTest):
         self.status = AlertDefinitionStatus.INACTIVE
 
         # -- Notification --
-        self.notification_id = None
+        self.alert_notification_id = None
         self.notification_period_quantity = 1
         self.notification_period_unit = NotificationPeriod.DAY
         self.email = "test@test.com"
@@ -152,7 +156,11 @@ class AlertManagerTest(MyIntegrationTest):
 
     def set_tests_to_run(self):
         return [
-            self.test__notif_true_no_data
+            self.test__notif_true__no_data,
+            self.test__notif_true__with_data,
+            self.test__notif_false__time_between,
+            self.test__notif_false__days,
+            self.test__notif_false__hours
         ]
 
     def create_tables(self):
@@ -163,7 +171,7 @@ class AlertManagerTest(MyIntegrationTest):
     # SET UP
 
     def set_up_test(self):
-        for table in AlertManagerTest.__tables:
+        for table in reversed(AlertManagerTest.__tables):
             print(table, "cleaning ...")
             MyIntegrationTest.clean_table(table.name)
 
@@ -231,11 +239,12 @@ class AlertManagerTest(MyIntegrationTest):
 
         # Definition - Notification TIME
         if self.last_notification_time:
-            insert_in_alert_definition_notification_time(
-                notification_id=self.notification_id,
+            notification_time_id = insert_in_alert_definition_notification_time(
+                notification_id=self.alert_notification_id,
                 alert_definition_id=self.alert_definition_id,
                 notification_datetime=self.last_notification_time
             )
+
 
 
     def test_it(self):
@@ -255,6 +264,23 @@ class AlertManagerTest(MyIntegrationTest):
 
         self.operator = MyOperator.MAX
         self.comparator = MyComparator.INF
+        self.acceptable_diff = False
+        self.value_number = max(self.donnee_comptage_list) + 10
+
+        self.data_period_type = PeriodGeneratorType.USER_BASED
+        self.data_period_quantity = 5
+
+        self.value_number = 15
+        self.value_type = ValueGeneratorType.USER_BASED_VALUE
+        self.value_period_type = None
+
+
+    def is_alert__false__acceptable_diff_data_user_based(self):
+        self.donnee_comptage_list = [3, 2, 5, 1, 4]
+        self.donnee_comptage_delta = timedelta(hours=1)
+
+        self.operator = MyOperator.MAX
+        self.comparator = MyComparator.SUP
         self.acceptable_diff = False
         self.value_number = max(self.donnee_comptage_list) + 10
 
@@ -307,10 +333,9 @@ class AlertManagerTest(MyIntegrationTest):
         self.notification_period_quantity = 10
 
     def notification_enough_time_between__false(self):
-        self.last_notification_time = self.today - timedelta(days=10)
+        self.last_notification_time = self.today - timedelta(days=5)
         self.notification_period_unit = PeriodUnitDefinition.DAY
-        self.notification_period_quantity = 5
-
+        self.notification_period_quantity = 10
 
     # -----------------    CHECK DATA IN DB    -----------------
 
@@ -318,15 +343,61 @@ class AlertManagerTest(MyIntegrationTest):
         query = "SELECT * FROM {}".format(table_name)
         cursor = my_sql.generate_cursor()
         cursor.execute(operation=query)
+        columns_name = cursor.column_names
         results = cursor.fetchall()
-        return results
+        return columns_name, results
+
+    # -----------------    ASSERT PERSONALIZED    -----------------
+
+    # ALERT
+    def assert_alert__saved(self, expected_id=1):
+        columns_name, results = self.query_select_all(table_name=alert_alert_table.name)
+        print(results)
+
+        # len result
+        assert len(results) == expected_id
+        results = results[expected_id - 1]
+
+        # alert_definition_id
+        index = columns_name.index("alert_definition_id")
+        assert self.alert_definition_id == results[index]
+        print("alert {} saved".format(expected_id))
+
+    def assert_alert__not_saved(self, expected_id=1):
+        columns_name, results = self.query_select_all(table_name=alert_definition_notification_table.name)
+        print(results)
+
+        # len result
+        assert len(results) == expected_id - 1
+
+    # NOTIFICATION
+    def assert_notification__saved(self, expected_id=1):
+        columns_name, results = self.query_select_all(table_name=alert_definition_notification_table.name)
+        print(results)
+
+        # len result
+        assert len(results) == expected_id
+        results = results[expected_id - 1]
+
+        # alert_definition_id
+        index = columns_name.index("alert_definition_id")
+        assert self.alert_definition_id == results[index]
+
+        # alert_notification_id
+        index = columns_name.index("notification_id")
+        assert self.alert_definition_id == results[index]
+        print("notif {} saved".format(expected_id))
+
+    def assert_notification__not_saved(self, expected_id=1):
+        columns_name, results = self.query_select_all(table_name=alert_definition_notification_table.name)
+        print(results)
+
+        # len result
+        assert len(results) == expected_id - 1
 
 
-
-
-    # TESTS
-    def test__notif_true_no_data(self):
-
+    # NOTIFICATION TEST
+    def test__notif_true__no_data(self):
         # alert true
         self.is_alert__true__acceptable_diff_data_user_based()
 
@@ -335,12 +406,89 @@ class AlertManagerTest(MyIntegrationTest):
         self.notification_hour__true()
         self.notification_enough_time_between__true__no_data()
 
-        with patch('model.alert.Email.send') as email_mock :
+        with patch('model.alert.Email.send', return_value=True) as email_mock:
             self.test_it()
-            results = self.query_select_all(table_name=alert_alert_table.name)
-            print(results)
-            assert len(results) >= 0
             email_mock.assert_called()
+            self.assert_alert__saved()
+            self.assert_notification__saved()
+
+    def test__notif_true__with_data(self):
+        # alert true
+        self.is_alert__true__acceptable_diff_data_user_based()
+
+        # Notif true - with data
+        self.notification_day__true()
+        self.notification_hour__true()
+        self.notification_enough_time_between__true__with_data()
+
+        with patch('model.alert.Email.send', return_value=True) as email_mock:
+            self.test_it()
+            email_mock.assert_called()
+            self.assert_alert__saved()
+            self.assert_notification__saved(expected_id=2)
+
+    def test__notif_false__time_between(self):
+        # alert true
+        self.is_alert__true__acceptable_diff_data_user_based()
+
+        # Notif true - with data
+        self.notification_day__true()
+        self.notification_hour__true()
+        self.notification_enough_time_between__false()
+
+        with patch('model.alert.Email.send', return_value=True) as email_mock:
+            self.test_it()
+            email_mock.assert_not_called()
+            self.assert_alert__saved()
+            self.assert_notification__not_saved(expected_id=2)
+
+    def test__notif_false__days(self):
+        # alert true
+        self.is_alert__true__acceptable_diff_data_user_based()
+
+        # Notif true - with data
+        self.notification_day__false()
+        self.notification_hour__true()
+        self.notification_enough_time_between__true__no_data()
+
+        with patch('model.alert.Email.send', return_value=True) as email_mock:
+            self.test_it()
+            email_mock.assert_not_called()
+            self.assert_alert__saved()
+            self.assert_notification__not_saved(expected_id=1)
+
+    def test__notif_false__hours(self):
+        # alert true
+        self.is_alert__true__acceptable_diff_data_user_based()
+
+        # Notif true - with data
+        self.notification_day__true()
+        self.notification_hour__false()
+        self.notification_enough_time_between__true__no_data()
+
+        with patch('model.alert.Email.send', return_value=True) as email_mock:
+            self.test_it()
+            email_mock.assert_not_called()
+            self.assert_alert__saved()
+            self.assert_notification__not_saved(expected_id=1)
+
+    def test__notif_false__not_alert(self):
+        # alert true
+        self.is_alert__false__acceptable_diff_data_user_based()
+
+        # Notif true - with data
+        self.notification_day__true()
+        self.notification_hour__true()
+        self.notification_enough_time_between__true__no_data()
+
+        with patch('model.alert.Email.send', return_value=True) as email_mock:
+            with patch('model.alert.AlertNotification.is_notification_allowed') as check_notif_mock:
+                self.test_it()
+                email_mock.assert_not_called()
+                check_notif_mock.assert_not_called()
+                self.assert_alert__not_saved()
+                self.assert_notification__not_saved(expected_id=1)
+
 
 
 
