@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 from datetime import datetime, timedelta
+from statistics import mean
 from unittest.mock import patch
 
 from model.alert import PeriodUnitDefinition, Hour, Day, MyOperator, MyComparator, PeriodGeneratorType, \
@@ -10,7 +11,7 @@ from scripts.alert_tables_creation import alert_notification_table, alert_calcul
 from scripts.test__create_and_insert_data_in_fake_tables import bi_compteurs_table, bi_objectif_table, \
     bi_comptages_donnees, insert_in_bi_compteurs, insert_in_bi_objectifs, insert_in_notification, insert_in_calculator, \
     insert_in_alert_definition, insert_in_alert_definition_meter, insert_in_bi_comptage_donnees, \
-    insert_in_alert_definition_notification_time
+    insert_in_alert_definition_notification_time, insert_in_alert_manager
 
 
 class MyIntegrationTest(ABC):
@@ -31,14 +32,17 @@ class MyIntegrationTest(ABC):
         self.__use_db()
 
         self._tests = self.set_tests_to_run()
-        self.create_tables()
 
     def start(self):
         for test in self._tests:
             print("\n____SET UP___")
-            self.set_up_test()
+            self.set_up()
             print("\n \t\t\t------->\t\tSTART TEST :", test.__name__, "\n")
             test()
+            print("\n____THEAR DOWN___")
+            self.tear_down()
+
+
 
     def __del__(self):
         print("\n_________________DEL_________________")
@@ -50,12 +54,11 @@ class MyIntegrationTest(ABC):
     def set_tests_to_run(self):
         raise NotImplementedError
 
-    def set_up_test(self):
+    def set_up(self):
         pass
 
-    @abstractmethod
-    def create_tables(self):
-        raise NotImplementedError
+    def tear_down(self):
+        pass
 
     # DATABASE - CREATION & DESTRUCTION
 
@@ -77,8 +80,8 @@ class MyIntegrationTest(ABC):
     # DATABASE - UTILS
 
     @staticmethod
-    def clean_table(table_name: str):
-        query = "DELETE FROM {}".format(table_name)
+    def drop_table(table_name: str):
+        query = "DROP TABLES {}".format(table_name)
         print(query)
         my_sql.execute_and_close(query=query)
 
@@ -100,59 +103,7 @@ class AlertManagerTest(MyIntegrationTest):
     def __init__(self):
         super().__init__()
 
-        self.today = datetime.today()
-
-        # -- METER --
-        self.meter_id = None
-        self.is_meter_index = False
-
-        # -- Alert Definition --
-        self.alert_definition_id = None
-        self.name = "alert_definition_name"
-        self.description = "i am supposed to describe the Alert definition"
-        self.category = "category"
-        self.level = Level.HIGH
-        self.status = AlertDefinitionStatus.INACTIVE
-
-        # -- Notification --
-        self.alert_notification_id = None
-        self.notification_period_quantity = 1
-        self.notification_period_unit = NotificationPeriod.DAY
-        self.email = "test@test.com"
-        self.notification_days = [
-            Day.MONDAY, Day.TUESDAY
-        ]
-        self.notification_hours = [
-            Hour.H_1, Hour.H_2
-        ]
-
-        # -- Calculator --
-        self.calculator_id = None
-        self.operator = MyOperator.MAX
-        self.comparator = MyComparator.SUP
-        self.acceptable_diff = True
-        # data
-        self.data_period_type = PeriodGeneratorType.USER_BASED
-        self.data_period_unit = PeriodUnitDefinition.DAY
-        self.data_period_quantity = 1
-        self.hour_start = None
-        self.hour_end = None
-        # value
-        self.value_number = 15
-        self.value_type = ValueGeneratorType.USER_BASED_VALUE
-        self.value_period_type = None
-
-        # -- OBJECTIF --
-        self.objectif_value = 20
-        self.objectif_time_unit = None
-
-        # -- DONNEE COMPTAGE --
-        self.donnee_comptage_list = [3, 2, 5, 1, 4]
-        self.donnee_comptage_end_day = self.today - timedelta(days=1)
-        self.donnee_comptage_delta = timedelta(hours=1)
-
-        # DEFINITION - NOTIFICATION
-        self.last_notification_time = None
+        self.simplest_case()
 
     def set_tests_to_run(self):
         return [
@@ -160,7 +111,19 @@ class AlertManagerTest(MyIntegrationTest):
             self.test__notif_true__with_data,
             self.test__notif_false__time_between,
             self.test__notif_false__days,
-            self.test__notif_false__hours
+            self.test__notif_false__hours,
+            self.test__simple_alert__true__data_last_check__accept_false__value_user_based__max__inf,
+            self.test__simple_alert__false__data_last_check__accept_false__value_user_based__max__inf,
+            self.test__simple_alert__true__data_last_check__accept_false__value_user_based__max__sup,
+            self.test__simple_alert__false__data_last_check__accept_false__value_user_based__max__sup,
+            self.test__simple_alert__true__data_last_check__accept_false__value_user_based__max__equal,
+            self.test__simple_alert__false__data_last_check__accept_false__value_user_based__max__equal,
+            self.test__simple_alert__true__data_last_check__accept_false__value_user_based__average__equal,
+            self.test__simple_alert__false__data_last_check__accept_false__value_user_based__average__equal,
+            self.test__simple_alert__true__data_last_check__accept_false__value_user_based__average__equal,
+            self.test__simple_alert__false__data_last_check__accept_false__value_user_based__average__equal,
+            self.test__simple_alert__true__data_user_based,
+            self.test__simple_alert__false__data_user_based
         ]
 
     def create_tables(self):
@@ -170,11 +133,14 @@ class AlertManagerTest(MyIntegrationTest):
 
     # SET UP
 
-    def set_up_test(self):
-        for table in reversed(AlertManagerTest.__tables):
-            print(table, "cleaning ...")
-            MyIntegrationTest.clean_table(table.name)
+    def set_up(self):
+        self.create_tables()
+        self.simplest_case()
 
+    def tear_down(self):
+        for table in reversed(AlertManagerTest.__tables):
+            print(table, "dropped ...")
+            MyIntegrationTest.drop_table(table.name)
 
     def insert_defined_data(self):
         self.meter_id = insert_in_bi_compteurs(
@@ -202,7 +168,7 @@ class AlertManagerTest(MyIntegrationTest):
             comparator=self.comparator.name,
             data_period_type=self.data_period_type.name,
             data_period_quantity=self.data_period_quantity,
-            data_period_unit=self.data_period_unit.name,
+            data_period_unit=self.data_period_unit if not isinstance(self.data_period_unit, PeriodUnitDefinition) else self.data_period_unit.name,
             value_type=self.value_type.name,
             value_number=self.value_number,
             value_period_type=self.value_period_type if not isinstance(self.value_period_type, ValuePeriodType) else self.value_period_type.name,
@@ -212,11 +178,11 @@ class AlertManagerTest(MyIntegrationTest):
         )
 
         self.alert_definition_id = insert_in_alert_definition(
-            name="definition_name_1",
-            category="definition_category_1",
-            description="description_1",
-            level=Level.HIGH.value,
-            status=AlertDefinitionStatus.ACTIVE.value,
+            name=self.name,
+            category=self.category,
+            description=self.description,
+            level=self.level.value,
+            status=self.status.value,
             notification_id=self.alert_notification_id,
             calculator_id=self.alert_calculator_id
         )
@@ -245,7 +211,69 @@ class AlertManagerTest(MyIntegrationTest):
                 notification_datetime=self.last_notification_time
             )
 
+        if self.last_check:
+            insert_in_alert_manager(
+                launch_datetime=self.last_check
+            )
 
+    def simplest_case(self):
+        self.today = datetime.today()
+
+        # -- OBJECTIF --
+        self.objectif_value = 20
+        self.objectif_time_unit = None
+
+        # -- DONNEE COMPTAGE --
+        self.donnee_comptage_list = [3, 2, 5, 1, 4]
+        self.donnee_comptage_end_day = self.today
+        self.donnee_comptage_delta = timedelta(hours=1)
+
+        # -- METER --
+        self.meter_id = None
+        self.is_meter_index = False
+
+        # -- Alert Definition --
+        self.alert_definition_id = None
+        self.name = "alert_definition_name"
+        self.description = "i am supposed to describe the Alert definition"
+        self.category = "category"
+        self.level = Level.HIGH
+        self.status = AlertDefinitionStatus.ACTIVE
+
+        # -- Notification --
+        self.alert_notification_id = None
+        self.notification_period_quantity = 1
+        self.notification_period_unit = NotificationPeriod.DAY
+        self.email = "test@test.com"
+        self.notification_days = [
+            Day.MONDAY, Day.TUESDAY
+        ]
+        self.notification_hours = [
+            Hour.H_1, Hour.H_2
+        ]
+
+        # -- Calculator --
+        self.calculator_id = None
+        self.operator = MyOperator.MAX
+        self.comparator = MyComparator.EQUAL
+        self.acceptable_diff = False
+        # data
+        self.data_period_type = PeriodGeneratorType.LAST_CHECK
+        self.data_period_unit = None
+        self.data_period_quantity = None
+        self.hour_start = None
+        self.hour_end = None
+        # value
+        self.value_number = max(self.donnee_comptage_list)
+        self.value_type = ValueGeneratorType.USER_BASED_VALUE
+        self.value_period_type = None
+
+
+        # DEFINITION - NOTIFICATION
+        self.last_notification_time = None
+
+        # MANAGER
+        self.last_check = None
 
     def test_it(self):
         self.insert_defined_data()
@@ -259,43 +287,17 @@ class AlertManagerTest(MyIntegrationTest):
 
     # Data Period Type
     def is_alert__true__acceptable_diff_data_user_based(self):
-        self.donnee_comptage_list = [3, 2, 5, 1, 4]
-        self.donnee_comptage_delta = timedelta(hours=1)
-
-        self.operator = MyOperator.MAX
-        self.comparator = MyComparator.INF
-        self.acceptable_diff = False
-        self.value_number = max(self.donnee_comptage_list) + 10
-
-        self.data_period_type = PeriodGeneratorType.USER_BASED
-        self.data_period_quantity = 5
-
-        self.value_number = 15
-        self.value_type = ValueGeneratorType.USER_BASED_VALUE
-        self.value_period_type = None
-
+        self.comparator = MyComparator.EQUAL
 
     def is_alert__false__acceptable_diff_data_user_based(self):
-        self.donnee_comptage_list = [3, 2, 5, 1, 4]
-        self.donnee_comptage_delta = timedelta(hours=1)
-
-        self.operator = MyOperator.MAX
         self.comparator = MyComparator.SUP
-        self.acceptable_diff = False
-        self.value_number = max(self.donnee_comptage_list) + 10
-
-        self.data_period_type = PeriodGeneratorType.USER_BASED
-        self.data_period_quantity = 5
-
-        self.value_number = 15
-        self.value_type = ValueGeneratorType.USER_BASED_VALUE
-        self.value_period_type = None
 
     # ---->  NOTIFICATION  <----
 
     # NOTIFICATION DAY
     def notification_day__true(self):
         day = Day[get_day_name_from_datetime(self.today).upper()]
+        print("HELLLO IT IS : ", day)
         if day not in self.notification_days:
             self.notification_days.append(day)
 
@@ -337,7 +339,18 @@ class AlertManagerTest(MyIntegrationTest):
         self.notification_period_unit = PeriodUnitDefinition.DAY
         self.notification_period_quantity = 10
 
-    # -----------------    CHECK DATA IN DB    -----------------
+    # SIMPLE N0TIFICATION SETUP
+    def simple_case__notification_true(self):
+        self.notification_hour__true()
+        self.notification_day__true()
+        self.notification_enough_time_between__true__no_data()
+
+    def simple_case__notification_false(self):
+        self.notification_day__false()
+        self.notification_hour__false()
+        self.notification_enough_time_between__true__no_data()
+
+    # -----------------      CHECK DATA IN DB     -----------------
 
     def query_select_all(self, table_name:str):
         query = "SELECT * FROM {}".format(table_name)
@@ -352,7 +365,7 @@ class AlertManagerTest(MyIntegrationTest):
     # ALERT
     def assert_alert__saved(self, expected_id=1):
         columns_name, results = self.query_select_all(table_name=alert_alert_table.name)
-        print(results)
+        print("RESULT", results)
 
         # len result
         assert len(results) == expected_id
@@ -362,6 +375,7 @@ class AlertManagerTest(MyIntegrationTest):
         index = columns_name.index("alert_definition_id")
         assert self.alert_definition_id == results[index]
         print("alert {} saved".format(expected_id))
+        return columns_name, results
 
     def assert_alert__not_saved(self, expected_id=1):
         columns_name, results = self.query_select_all(table_name=alert_definition_notification_table.name)
@@ -395,6 +409,7 @@ class AlertManagerTest(MyIntegrationTest):
         # len result
         assert len(results) == expected_id - 1
 
+    # -----------------            TEST           -----------------
 
     # NOTIFICATION TEST
     def test__notif_true__no_data(self):
@@ -408,8 +423,8 @@ class AlertManagerTest(MyIntegrationTest):
 
         with patch('model.alert.Email.send', return_value=True) as email_mock:
             self.test_it()
-            email_mock.assert_called()
             self.assert_alert__saved()
+            email_mock.assert_called()
             self.assert_notification__saved()
 
     def test__notif_true__with_data(self):
@@ -489,27 +504,235 @@ class AlertManagerTest(MyIntegrationTest):
                 self.assert_alert__not_saved()
                 self.assert_notification__not_saved(expected_id=1)
 
+    # CALCULATOR TEST
 
+    # SIMPLE - Inf
+    def test__simple_alert__true__data_last_check__accept_false__value_user_based__max__inf(self):
+        self.simple_case__notification_false()
 
+        self.comparator = MyComparator.INF
+        self.value_number = max(self.donnee_comptage_list) + 1
 
+        self.test_it()
+        columns_name, results = self.assert_alert__saved()
 
+        # Data check
+        index = columns_name.index("data")
+        assert max(self.donnee_comptage_list) == results[index]
 
+        # Value check
+        index = columns_name.index("value")
+        assert self.value_number == results[index]
 
+    def test__simple_alert__false__data_last_check__accept_false__value_user_based__max__inf(self):
+        self.simple_case__notification_false()
+        self.comparator = MyComparator.INF
+        self.value_number = max(self.donnee_comptage_list) - 1
 
+        self.test_it()
 
+        self.assert_alert__not_saved()
 
+    # SIMPLE - Sup
+    def test__simple_alert__true__data_last_check__accept_false__value_user_based__max__sup(self):
+        self.simple_case__notification_false()
+        self.comparator = MyComparator.SUP
+        self.value_number = max(self.donnee_comptage_list) - 1
 
+        self.test_it()
 
+        columns_name, results = self.assert_alert__saved()
 
+        # Data check
+        index = columns_name.index("data")
+        assert max(self.donnee_comptage_list) == results[index]
 
+        # Value check
+        index = columns_name.index("value")
+        assert self.value_number == results[index]
 
+    def test__simple_alert__false__data_last_check__accept_false__value_user_based__max__sup(self):
+        self.simple_case__notification_false()
+        self.comparator = MyComparator.SUP
+        self.value_number = max(self.donnee_comptage_list) + 1
 
+        self.test_it()
 
+        self.assert_alert__not_saved()
 
+    # SIMPLE - Equal
+    def test__simple_alert__true__data_last_check__accept_false__value_user_based__max__equal(self):
+        self.simple_case__notification_false()
 
+        self.test_it()
 
+        columns_name, results = self.assert_alert__saved()
 
+        # Data check
+        index = columns_name.index("data")
+        assert max(self.donnee_comptage_list) == results[index]
 
+        # Value check
+        index = columns_name.index("value")
+        assert self.value_number == results[index]
+
+    def test__simple_alert__false__data_last_check__accept_false__value_user_based__max__equal(self):
+        self.simple_case__notification_false()
+        self.value_number = max(self.donnee_comptage_list) - 1
+
+        self.test_it()
+
+        self.assert_alert__not_saved()
+
+    # SIMPLE - Min
+    def test__simple_alert__true__data_last_check__accept_false__value_user_based__min__equal(self):
+        self.simple_case__notification_false()
+
+        self.operator = MyOperator.MIN
+        self.value_number = min(self.donnee_comptage_list)
+
+        self.test_it()
+        columns_name, results = self.assert_alert__saved()
+
+        # Data check
+        index = columns_name.index("data")
+        assert min(self.donnee_comptage_list) == results[index]
+
+        # Value check
+        index = columns_name.index("value")
+        assert self.value_number == results[index]
+
+    def test__simple_alert__false__data_last_check__accept_false__value_user_based__min__equal(self):
+        self.simple_case__notification_false()
+
+        self.operator = MyOperator.MIN
+        self.value_number = min(self.donnee_comptage_list) - 1
+
+        self.test_it()
+
+        self.assert_alert__not_saved()
+
+    # SIMPLE - AVERAGE
+    def test__simple_alert__true__data_last_check__accept_false__value_user_based__average__equal(self):
+        self.simple_case__notification_false()
+
+        self.operator = MyOperator.AVERAGE
+        self.value_number = mean(self.donnee_comptage_list)
+
+        self.test_it()
+        columns_name, results = self.assert_alert__saved()
+
+        # Data check
+        index = columns_name.index("data")
+        assert mean(self.donnee_comptage_list) == results[index]
+
+        # Value check
+        index = columns_name.index("value")
+        assert self.value_number == results[index]
+
+    def test__simple_alert__false__data_last_check__accept_false__value_user_based__average__equal(self):
+        self.simple_case__notification_false()
+
+        self.operator = MyOperator.AVERAGE
+        self.value_number = mean(self.donnee_comptage_list) - 1
+
+        self.test_it()
+
+        self.assert_alert__not_saved()
+
+    # DATA - Data Period Type - LAST_CHECK
+    def test__simple_alert__true__data_last_check__not_all(self):
+        self.simple_case__notification_false()
+
+        self.last_check = self.today - timedelta(days=2)
+        self.donnee_comptage_delta = timedelta(days=1)
+
+        result_expected = self.donnee_comptage_list[:2]
+        self.value_number = max(result_expected)
+
+        self.test_it()
+
+        columns_name, results = self.assert_alert__saved()
+
+        # Data check
+        index = columns_name.index("data")
+        assert max(result_expected) == results[index]
+
+        # Value check
+        index = columns_name.index("value")
+        assert self.value_number == results[index]
+
+    def test__simple_alert__false__data_last_check__accept_false__value_user_based__max__equal(self):
+        self.simple_case__notification_false()
+        self.value_number = max(self.donnee_comptage_list)
+
+        self.test_it()
+
+        self.assert_alert__not_saved()
+
+    # DATA - Data Period Type - USER_BASED
+    def test__simple_alert__true__data_user_based(self):
+        self.simple_case__notification_false()
+
+        self.data_period_type = PeriodGeneratorType.USER_BASED
+        self.data_period_unit = PeriodUnitDefinition.HOUR
+        self.data_period_quantity = 2
+
+        result_expected = self.donnee_comptage_list[:2]
+        self.value_number = max(result_expected)
+
+        self.test_it()
+
+        columns_name, results = self.assert_alert__saved()
+
+        # Data check
+        index = columns_name.index("data")
+        assert max(result_expected) == results[index]
+
+        # Value check
+        index = columns_name.index("value")
+        assert self.value_number == results[index]
+
+    def test__simple_alert__false__data_user_based(self):
+        self.simple_case__notification_false()
+        self.value_number = max(self.donnee_comptage_list)
+
+        self.test_it()
+
+        self.assert_alert__not_saved()
+
+    # DATA - Data Period Type - USER_BASED hours
+    def test__simple_alert__true__data_user_based(self):
+        self.simple_case__notification_false()
+
+        self.data_period_type = PeriodGeneratorType.USER_BASED
+        self.data_period_unit = PeriodUnitDefinition.DAY
+        self.data_period_quantity = 2
+        self.hour_start = (self.today - timedelta(hours=5)).hour
+        self.hour_end = (self.today - timedelta(hours=3)).hour
+
+        result_expected = self.donnee_comptage_list[:2]
+        self.value_number = max(result_expected)
+
+        self.test_it()
+
+        columns_name, results = self.assert_alert__saved()
+
+        # Data check
+        index = columns_name.index("data")
+        assert max(result_expected) == results[index]
+
+        # Value check
+        index = columns_name.index("value")
+        assert self.value_number == results[index]
+
+    def test__simple_alert__false__data_user_based(self):
+        self.simple_case__notification_false()
+        self.value_number = max(self.donnee_comptage_list)
+
+        self.test_it()
+
+        self.assert_alert__not_saved()
 
 
 

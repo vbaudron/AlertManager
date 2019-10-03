@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 from model.utils import METER_TABLE_NAME, TableToGenerate, NOTIFICATION_COMPO, NOTIFICATION_NAME, \
     CALCULATOR_COMPO, CALCULATOR_NAME, DEFINITION_COMPO, DEFINITION_TABLE_NAME, METER_DEFINITION_COMPO, \
     METER_DEFINITIONS_ALERT_TABLE_NAME, insert_query_construction, ALERT_DEFINITION_NOTIFICATION_TIME_COMPO, \
-    ALERT_DEFINITION_NOTIFICATION_TIME
+    ALERT_DEFINITION_NOTIFICATION_TIME, ALERT_MANAGER_TABLE_NAME, ALERT_MANAGER_TABLE_COMPO
 from scripts.alert_tables_creation import create_alert_related_tables
 
 
@@ -274,6 +274,16 @@ def insert_in_alert_definition_notification_time(notification_id, alert_definiti
         notification_id,
         alert_definition_id,
         notification_datetime
+    ]
+    print("query", query)
+    print("params", params)
+    return my_sql.execute_and_close(query=query, params=params, return_id=True)
+
+# ALERT MANAGER
+def insert_in_alert_manager(launch_datetime: datetime):
+    query = insert_query_construction(compo=ALERT_MANAGER_TABLE_COMPO, name=ALERT_MANAGER_TABLE_NAME)
+    params = [
+        launch_datetime
     ]
     print("query", query)
     print("params", params)

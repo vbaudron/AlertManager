@@ -11,6 +11,7 @@ import calendar
 from datetime import datetime, timedelta
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
+from statistics import mean
 from typing import Any, Union
 
 from mailjet_rest import Client
@@ -29,7 +30,7 @@ from enum import Enum, auto, unique, Flag, IntEnum
 # ---------------------------------------------------   OPERATOR   -----------------------------------------------------
 
 def calculate_average(data: array):
-    return sum(data) / len(data)
+    return mean(data)
 
 
 def find_max(data: array):
@@ -498,9 +499,9 @@ class AlertData:
 
 
 class HandleDataFromDB:
-    table_name = "bi_donneescomptage"
+    table_name = "bi_donnescomptage"
     value_column_name = "valeur"
-    meter_id_column_name = "r_compteurs"
+    meter_id_column_name = "r_compteur"
     hour_column_name = "date_heure"
 
     __period: Period
@@ -1066,6 +1067,7 @@ class Email:
         }
         result = mailjet.send.create(data=data)
         if result.status_code == 200:
+            print("email SENT to", self.__receiver_email)
             return True
         else:
             log.error("email not send. Status code :", result.status_code, "details :", result.json())
@@ -1300,13 +1302,12 @@ class AlertDefinition:
                 meter_id,
                 self.__name
             ),
-            "button_link": "http://dev.emanager.softee.fr/alert/{}".format(alert.id)
+            "button_link": "http://dev.emanager.softee.fr/alertdefinition/monitoring"
         }
         email = Email()
         email.prepare(filename=AlertDefinition.ALERT_EMAIL_CONFIG_FILENAME)
         email.generate_template(replacements=replacements)
         if email.send(self.notification.email):
-            print("email SEND")
             self.add_notification_in_db(time=time)
 
     def add_notification_in_db(self, time: datetime):
@@ -1426,7 +1427,7 @@ class AlertManager:
         cursor.execute(operation=query)
         result = cursor.fetchall()
         if not result:
-            return datetime.today() - timedelta(days=1)
+            return go_past_with_years(end_date=datetime.today(), quantity=1)
         return result[0][0]
 
     @staticmethod

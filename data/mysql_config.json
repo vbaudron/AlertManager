@@ -1,7 +1,7 @@
 {
-  "host": "localhost",
-  "port": 8889,
-  "username": "root",
-  "password": "root",
+  "host": "ml135938-001.dbaas.ovh.net",
+  "port": 35466,
+  "username": "ADM_DEV",
+  "password": "AdmDev123",
   "database": "bd_dev"
 }
