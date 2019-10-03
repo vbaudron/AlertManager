@@ -434,4 +434,5 @@ def generate_days_flag(notification_days: list):
     days = 0
     for day in notification_days:
         days |= day.value
+        print("day ", day, " value :", day.value, " ==> days =", days)
     return days
