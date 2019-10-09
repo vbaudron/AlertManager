@@ -123,14 +123,28 @@ def go_past_with_months(end_date: datetime, quantity: int) -> datetime:
 
     last_day_of_month = calendar.monthrange(new_year, new_month)[1]
     new_day = min(end_date.day, last_day_of_month)
-    return datetime(year=new_year, month=new_month, day=new_day)
+    return datetime(
+        year=new_year,
+        month=new_month,
+        day=new_day,
+        hour=end_date.hour,
+        minute=end_date.minute,
+        microsecond=end_date.microsecond
+    )
 
 
 def go_past_with_years(end_date: datetime, quantity: int) -> datetime:
     new_year = end_date.year - quantity
     last_day_of_month = calendar.monthrange(new_year, end_date.month)[1]
     new_day = min(end_date.day, last_day_of_month)
-    return datetime(year=new_year, month=end_date.month, day=new_day)
+    return datetime(
+        year=new_year,
+        month=end_date.month,
+        day=new_day,
+        hour=end_date.hour,
+        minute=end_date.minute,
+        microsecond=end_date.microsecond
+    )
 
 
 class PeriodUnitDefinition(Enum):
@@ -230,9 +244,8 @@ class UserBasedGoBackPeriodGenerator(PeriodGenerator):
         self.__generate_period(to_date=to_date)
 
     def __generate_period_definition(self, unit, quantity: int):
-        print("__generate_period_definition UNIT", unit)
         if not isinstance(unit, PeriodUnitDefinition):
-            try :
+            try:
                 unit = PeriodUnitDefinition(unit)
             except ValueError:
                 raise EnumError(except_enum=PeriodUnitDefinition, wrong_value=unit)
@@ -305,8 +318,6 @@ class SimpleDBBasedValueGenerator(DataBaseValueGenerator, ValueGenerator):  # GO
         params = [meter_id]
 
         print("Find Objectif :")
-        print("\tquery", query)
-        print("\tparams", params)
 
         cursor = my_sql.generate_cursor()
         cursor.execute(operation=query, params=params)
@@ -718,6 +729,7 @@ class AlertCalculator:
         print("\n --- Calculate Value ---")
         self.__alert_value.calculate_value(meter_id=meter_id, is_index=is_index)
         if self.acceptable_diff:
+            print("ACCEPTABLE DIFF")
             return self.comparator.get_new_value(
                 value=self.alert_value.value,
                 percent=self.alert_value.value_number
@@ -873,7 +885,7 @@ class AlertNotification:
 
     def query_last_notification_time(self, alert_definition_id: int):
         query = """ SELECT notification_datetime FROM {} 
-                    WHERE alert_definition_id=%s AND notification_id=%s 
+                    WHERE alert_definition_id=%s AND alert_notification_id=%s 
                     ORDER BY notification_datetime DESC LIMIT 1""".format(ALERT_DEFINITION_NOTIFICATION_TIME)
 
         params = (alert_definition_id, self.__id)
@@ -1114,7 +1126,7 @@ class Email:
 
 
 # -----------------------------------------------------   ALERT  -------------------------------------------------------
-
+@unique
 class AlertStatus(Enum):
     ARCHIVE = 0
     CURRENT = 1
@@ -1379,7 +1391,7 @@ class AlertManager:
     __alert_definition_list: list
     __today: datetime
 
-    def __init__(self):
+    def __init__(self, alert_definition_id=None):
         print("\n\nALERT MANAGER *** INIT ***")
         self.__today = datetime.today()
         data = self.get_alert_def_in_db()
@@ -1390,14 +1402,16 @@ class AlertManager:
 
         print("create AlertDefinition Instances")
         for setup in data:
-            print("_____________________________________________________________________________________________")
-            print("AlertDefinition to create from :")
-            for key, value in setup.items():
-                print('\t', key, ':', value)
-
             try:
-                alert_definition = AlertDefinition(setup=setup, last_check=last_check, today=self.today)
-                self.__alert_definition_list.append(alert_definition)
+                if not alert_definition_id or alert_definition_id == setup["id"]:
+                    print(
+                        "_____________________________________________________________________________________________")
+                    print("AlertDefinition to create from :")
+                    for key, value in setup.items():
+                        print('\t', key, ':', value)
+
+                    alert_definition = AlertDefinition(setup=setup, last_check=last_check, today=self.today)
+                    self.__alert_definition_list.append(alert_definition)
             except (KeyError, ConfigError, EnumError) as error:
                 log.error("[ALERT_DEFINITION_{}] {}".format(setup["id"], error.__str__()))
 
@@ -1451,8 +1465,8 @@ class AlertManager:
         return AlertManager.__handle_result(cursor=cursor)
 
     @staticmethod
-    def start():
-        alert_manager = AlertManager()
+    def start(alert_definition_id=None):
+        alert_manager = AlertManager(alert_definition_id=alert_definition_id)
         alert_manager.start_check()
         alert_manager.save()
 
