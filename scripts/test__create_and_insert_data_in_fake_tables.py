@@ -23,7 +23,6 @@ def insert_query_construction_without_id(compo, name):
 
     # QUERY
     query = "INSERT INTO {} ({}) VALUES ({})".format(name, params_str, format_param)
-    print(query)
     return query
 
 
@@ -57,7 +56,6 @@ def insert_in_bi_comptage_donnees(donnee_comptage_value, meter_id, time):
         meter_id,
         time
     ]
-    print("params", params)
     my_sql.execute_and_close(query=query, params=params)
 
 
@@ -188,7 +186,6 @@ def insert_in_bi_objectifs(objectif_value: float, time_unit: str, meter_id):
         time_unit,
         meter_id
     ]
-    print("params", params)
     return my_sql.execute_and_close(query=query, params=params, return_id=True)
 
 
@@ -212,8 +209,6 @@ def insert_in_notification(period_unit: str, period_quantity: int, email: str, d
         days_flags,
         hours_flags,
     ]
-    print("query", query)
-    print("params", params)
     return my_sql.execute_and_close(query=query, params=params, return_id=True)
 
 
@@ -233,8 +228,6 @@ def insert_in_calculator(operator, comparator, data_period_type, data_period_qua
         hour_end,
         acceptable_diff
     ]
-    print("query", query)
-    print("params", params)
     return my_sql.execute_and_close(query=query, params=params, return_id=True)
 
 
@@ -250,8 +243,6 @@ def insert_in_alert_definition(name, category, description, level, status, notif
         notification_id,
         calculator_id
     ]
-    print("query", query)
-    print("params", params)
     return my_sql.execute_and_close(query=query, params=params, return_id=True)
 
 
@@ -262,8 +253,6 @@ def insert_in_alert_definition_meter(meter_id: int, alert_definition_id: int):
         meter_id,
         alert_definition_id
     ]
-    print("query", query)
-    print("params", params)
     return my_sql.execute_and_close(query=query, params=params, return_id=True)
 
 
@@ -275,8 +264,6 @@ def insert_in_alert_definition_notification_time(notification_id, alert_definiti
         alert_definition_id,
         notification_datetime
     ]
-    print("query", query)
-    print("params", params)
     return my_sql.execute_and_close(query=query, params=params, return_id=True)
 
 # ALERT MANAGER
@@ -285,8 +272,6 @@ def insert_in_alert_manager(launch_datetime: datetime):
     params = [
         launch_datetime
     ]
-    print("query", query)
-    print("params", params)
     return my_sql.execute_and_close(query=query, params=params, return_id=True)
 
 

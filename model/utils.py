@@ -250,7 +250,6 @@ class TableToGenerate:
 
     def request_table_creation(self):
         query = self.__generate_alert_table_creation_query()
-        print(query)
         my_sql.execute_and_close(query=query)
         return TableToGenerate.check_if_table_created(table_name=self.__table_name)
 
@@ -385,13 +384,13 @@ ALERT_DEFINITION_NOTIFICATION_TIME = "alert_definition_notification_time"
 
 ALERT_DEFINITION_NOTIFICATION_TIME_COMPO = {
     "id": "INT AUTO_INCREMENT PRIMARY KEY",
-    "notification_id": "INT NOT NULL",
+    "alert_notification_id": "INT NOT NULL",
     "alert_definition_id": "INT NOT NULL",
     "notification_datetime": "DATETIME NOT NULL"
 }
 
 ALERT_DEFINITION_NOTIFICATION_TIME_FOREIGN_KEY = [
-    "FOREIGN KEY (notification_id) REFERENCES {}(id)".format(NOTIFICATION_NAME),
+    "FOREIGN KEY (alert_notification_id) REFERENCES {}(id)".format(NOTIFICATION_NAME),
     "FOREIGN KEY (alert_definition_id) REFERENCES {}(id)".format(DEFINITION_TABLE_NAME)
 ]
 
@@ -419,7 +418,6 @@ def insert_query_construction(compo, name):
 
     # QUERY
     query = "INSERT INTO {} ({}) VALUES ({})".format(name, params_str, format_param)
-    print(query)
     return query
 
 
