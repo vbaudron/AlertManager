@@ -1,6 +1,6 @@
 {
   "subject" : "| SOFTEE | You have an Alert ",
-  "sender_email" : "virginie.baudron@softee.fr",
+  "sender_email" : "noreply-alert@softee.fr",
   "template_name" : "alert_email_template",
   "replacement" : [
   ]
