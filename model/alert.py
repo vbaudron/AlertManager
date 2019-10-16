@@ -1202,8 +1202,9 @@ class AlertDefinitionFlag(Flag):
 # STATUS
 @unique
 class AlertDefinitionStatus(Enum):
-    INACTIVE = 0
+    ARCHIVE = 0
     ACTIVE = 1
+    INACTIVE = 2
 
 # LEVEL
 @unique

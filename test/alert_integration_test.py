@@ -1,7 +1,9 @@
+import sys
 from abc import ABC, abstractmethod
 from datetime import datetime, timedelta
 from statistics import mean
 from unittest.mock import patch
+import logging as log
 
 from model.alert import PeriodUnitDefinition, Hour, Day, MyOperator, MyComparator, PeriodGeneratorType, \
     ValueGeneratorType, ValuePeriodType, Level, AlertDefinitionStatus, NotificationPeriod, AlertManager, \
@@ -34,16 +36,24 @@ class MyIntegrationTest(ABC):
 
         self._tests = self.set_tests_to_run()
 
-    def start(self):
-        for test in self._tests:
-            print("\n____SET UP___")
-            self.set_up()
-            print("\n\n", self._tests.index(test) + 1, "\t\t\t------->\t\tSTART TEST :", test.__name__, "\n\n")
-            test()
-            print("\n____THEAR DOWN___")
-            self.tear_down()
+    def start(self, test_name=None):
+        if test_name:
+            if test_name in self._tests:
+                test = self._tests.index(test_name)
+                self.launch(test)
+            else:
+                log.error("{} is not a valid test name".format(test_name))
+        else:
+            for test in self._tests:
+                self.launch(test)
 
-
+    def launch(self, test):
+        print("\n____SET UP___")
+        self.set_up()
+        print("\n\n", self._tests.index(test) + 1, "\t\t\t------->\t\tSTART TEST :", test.__name__, "\n\n")
+        test()
+        print("\n____THEAR DOWN___")
+        self.tear_down()
 
     def __del__(self):
         print("\n_________________DEL_________________")
@@ -135,7 +145,8 @@ class AlertManagerTest(MyIntegrationTest):
             self.test__complex_alert__true__data_last_check__value_period_based__last_year,
             self.test__complex_alert__false__data_last_check__value_period_based__last_year,
             self.test__complex_alert__true__data_last_check__value_period_based__last_data_period,
-            self.test__complex_alert__false__data_last_check__value_period_based__last_data_period
+            self.test__complex_alert__false__data_last_check__value_period_based__last_data_period,
+            self.test__simple_alert__true__equal__is_index
         ]
 
     def create_tables(self):
@@ -152,7 +163,7 @@ class AlertManagerTest(MyIntegrationTest):
         for table in reversed(AlertManagerTest.__tables):
             MyIntegrationTest.drop_table(table.name)
 
-    def insert_defined_data(self):
+    def insert_defined_data(self, insert_all_donnee=True):
         self.meter_id = insert_in_bi_compteurs(
             name="meter_1",
             is_index=self.is_meter_index
@@ -206,7 +217,8 @@ class AlertManagerTest(MyIntegrationTest):
         self.insert_donnees_comptage(
             end_day=self.donnee_comptage_end_day,
             data_list=self.donnee_comptage_list,
-            delta = self.donnee_comptage_delta
+            delta=self.donnee_comptage_delta,
+            insert_all=insert_all_donnee
         )
 
         # Definition - Notification TIME
@@ -222,15 +234,18 @@ class AlertManagerTest(MyIntegrationTest):
                 launch_datetime=self.last_check
             )
 
-    def insert_donnees_comptage(self, end_day, data_list, delta):
+    def insert_donnees_comptage(self, end_day, data_list: list, delta, insert_all=True):
+        forgotten = 0
         for data in data_list:
             end_day -= delta
-            insert_in_bi_comptage_donnees(
-                donnee_comptage_value=data,
-                meter_id=self.meter_id,
-                time=end_day
-            )
-
+            if insert_all or forgotten is not 0 or data_list.index(data) is 0:
+                insert_in_bi_comptage_donnees(
+                    donnee_comptage_value=data,
+                    meter_id=self.meter_id,
+                    time=end_day
+                )
+            else:
+                forgotten += 1
 
     def simplest_case(self):
         self.today = datetime.today()
@@ -260,7 +275,7 @@ class AlertManagerTest(MyIntegrationTest):
         self.alert_notification_id = None
         self.notification_period_quantity = 1
         self.notification_period_unit = NotificationPeriod.DAY
-        self.email = "test@test.com"
+        self.email = "noreply-alert@softee.fr"
         self.notification_days = [
             Day[get_day_name_from_datetime(self.today).upper()]
         ]
@@ -453,11 +468,9 @@ class AlertManagerTest(MyIntegrationTest):
         self.notification_hour__true()
         self.notification_enough_time_between__true__with_data()
 
-        with patch('model.alert.Email.send', return_value=True) as email_mock:
-            self.test_it()
-            email_mock.assert_called()
-            self.assert_alert__saved()
-            self.assert_notification__saved(expected_id=2)
+        self.test_it()
+        self.assert_alert__saved()
+        self.assert_notification__saved(expected_id=2)
 
     def test__notif_false__time_between(self):
         # alert true
@@ -945,7 +958,7 @@ class AlertManagerTest(MyIntegrationTest):
         self.value_period_type = ValuePeriodType.LAST_YEAR
 
 
-        value_data_list = {1, 2, 2, 1, 0}
+        value_data_list = [1, 2, 2, 1, 0]
 
         self.value_number = 10
         value_expected = max(value_data_list) * (1 + (self.value_number / 100))
@@ -1082,10 +1095,31 @@ class AlertManagerTest(MyIntegrationTest):
 
         self.assert_alert__not_saved()
 
+    def test__simple_alert__true__equal__is_index(self):
+        self.simple_case__notification_false()
+        self.is_meter_index = True
+
+        self.insert_defined_data(insert_all_donnee=False)
+        self.test_it(insert_data=False)
+
+        columns_name, results = self.assert_alert__saved()
+
+        # Data check
+        index = columns_name.index("data")
+        assert max(self.donnee_comptage_list) == results[index]
+
+        # Value check
+        index = columns_name.index("value")
+        assert self.value_number == results[index]
+
+
+
 
 
 if __name__ == "__main__":
     print("\nTEST INIT\n")
     test_manager = AlertManagerTest()
+
     print("\n\nTEST START\n\n")
-    test_manager.start()
+    test_name = None if len(sys.argv) < 2 else sys.argv[1]
+    test_manager.start(test_name=test_name)
