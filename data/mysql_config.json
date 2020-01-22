@@ -2,6 +2,6 @@
   "host": "ml135938-001.dbaas.ovh.net",
   "port": 35466,
   "username": "ADM_DEV",
-  "password": "AdmDev123",
+  "password": "xxxx",
   "database": "bd_dev"
 }
